@@ -1,79 +1,170 @@
-# Fuck OpusClip.
+# THIH Clip Engine
 
-... because good video clips shouldn't come with ugly watermarks or platform lock-in.
+**AI-powered video clipping for sermons, messages, podcasts, teachings, and purpose-driven media.**
+
+Good clips should not come with ugly watermarks, platform lock-in, or creative hostage-taking.
+
+THIH Clip Engine gives creators, ministries, teachers, operators, and service-minded builders a self-hostable clipping system they can run, inspect, customize, and steward on their own terms.
 
 <p align="center">
-  <a href="https://www.supoclip.com">
-    <img src="assets/banner.png" alt="SupoClip Banner" width="100%" />
-  </a>
+  <img src="assets/banner.png" alt="THIH Clip Engine Banner" width="100%" />
 </p>
 
-SupoClip gives you AI-powered video clipping capabilities in an open-source package you can run yourself, customize, and inspect. Use the hosted version when you want the convenience of managed infrastructure, or self-host when you want full control.
+## What THIH Clip Engine Does
 
-> For the hosted version, sign up for the waitlist here: [SupoClip Hosted](https://www.supoclip.com)
+THIH Clip Engine turns long-form video into short-form clips using transcription, AI-assisted segment selection, captions, editing tools, and export workflows.
 
-## Why SupoClip Exists
+It is designed for:
 
-### The OpusClip Problem
+* Sermon shorts
+* Podcast cutdowns
+* Teaching clips
+* Devotional moments
+* Testimony highlights
+* YouTube Shorts
+* Instagram Reels
+* TikTok clips
+* LinkedIn thought leadership
+* THIH Systems content
+* Faith, work, leadership, and marketplace ministry media
 
-OpusClip is undeniably powerful. It's an AI video clipping tool that can turn long-form content into viral short clips with features like:
+This project is built for creators who believe content should serve before it sells.
 
-- AI-powered clip generation from long videos
-- Automated captions with 97%+ accuracy
-- Virality scoring to predict viral potential
-- Multi-language support (20+ languages)
-- Brand templates and customization
+## Why This Exists
 
-**But here's the catch:**
+Most clipping tools are useful, but they usually come with trade-offs:
 
-- **Usage limits**: Processing minutes are capped by plan
-- **Watermarks**: Some exports can include platform branding
-- **Processing limits**: Even paid plans have strict minute limits
-- **Vendor lock-in**: Your content and workflows are tied to their platform
+* Processing limits
+* Export restrictions
+* Watermarks
+* Locked workflows
+* Limited customization
+* Dependency on someone else’s platform
+* Pricing that grows as your content volume grows
 
-### The SupoClip Solution
+That may work for casual creators.
 
-SupoClip provides the same core functionality with more control:
+It does not work for builders, ministries, churches, educators, founders, or service businesses that need ownership, repeatability, and long-term control.
 
-→ ✅ **Self-Hostable** - Run it on your own infrastructure
+THIH Clip Engine exists to give you a clipping system you can shape around your own mission.
 
-→ ✅ **No Watermarks** - Your content stays yours
+## The THIH Difference
 
-→ ✅ **Open Source** - Full transparency, community-driven development
+THIH Clip Engine is not merely a “viral clip finder.”
 
-→ ✅ **Hosted Option** - Use SupoClip without managing servers
+It is being customized to support content that is:
 
-→ ✅ **Unlimited Usage** - Process as many videos as your hardware can handle
+* Clear
+* Useful
+* Purposeful
+* Platform-ready
+* Brand-aligned
+* Stewarded well
+* Rooted in message integrity
 
-→ ✅ **Customizable** - Modify and extend the codebase to fit your needs
+Virality matters, but it is not the altar.
+
+Reach is useful. Stewardship is better.
+
+## Core Features
+
+* AI-assisted clip generation from long-form video
+* YouTube URL and file upload support
+* Automated transcription through AssemblyAI
+* LLM-powered transcript analysis
+* Short-form clip recommendations
+* Caption generation and styling
+* Clip preview and review workflow
+* Export-ready short-form assets
+* Self-hosted deployment through Docker Compose
+* PostgreSQL metadata storage
+* Redis-powered background processing
+* FastAPI backend
+* Next.js frontend
+* Customizable codebase
+* No forced platform watermark
+* No vendor lock-in
+
+## Intended THIH Use Cases
+
+### THIH Ministry
+
+Use the engine to create sermon clips, devotional shorts, teaching moments, and faith-based content that helps people hear, understand, and apply the Word.
+
+Examples:
+
+* “Set Apart Without Arrogance”
+* “Fruit Is God’s Department, Abiding Is Yours”
+* “The Armor of God Is Not Symbolic”
+* “Renew Your Mind”
+* “Stewardship Over Striving”
+
+### THIH Systems
+
+Use the engine to create LinkedIn and short-form business content from long-form strategy sessions, founder thoughts, AI systems breakdowns, client education, and operational teachings.
+
+Examples:
+
+* AI systems clips
+* Follow-up pipeline breakdowns
+* Lead capture education
+* Workflow infrastructure insights
+* Service-business operations content
+* Founder-led market positioning
+
+### THIH Studios
+
+Use the engine as the production layer for podcasts, YouTube episodes, sermon clips, music reflections, and brand media.
+
+Examples:
+
+* Podcast clips
+* YouTube Shorts
+* Spotify video clips
+* Instagram Reels
+* Sermon quote videos
+* Teaching highlights
 
 ## Quick Start
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- An AssemblyAI API key (for transcription) - [Get one here](https://www.assemblyai.com/)
-- An LLM provider for AI analysis - OpenAI, Google, Anthropic, or Ollama
+Before running THIH Clip Engine, make sure you have:
 
-### 1. Clone and Configure
+* Docker
+* Docker Compose
+* An AssemblyAI API key for transcription
+* One supported LLM provider for AI analysis
+
+Supported LLM provider options may include:
+
+* Google Gemini
+* OpenAI
+* Anthropic Claude
+* Ollama for local or self-hosted models
+
+## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/FujiwaraChoki/supoclip.git
-cd supoclip
+git clone https://github.com/thehustleisholy-ship-it/THIH-Clip-Engine.git
+cd THIH-Clip-Engine
 ```
 
-Create a `.env` file in the root directory:
+## 2. Create Your Environment File
+
+Create a `.env` file in the project root.
 
 ```env
 # Required: Video transcription
 ASSEMBLY_AI_API_KEY=your_assemblyai_api_key
 
 # Required: Choose ONE LLM provider and set its API key
-# Option A: Google Gemini (recommended - fast & cost-effective)
+
+# Option A: Google Gemini
 LLM=google-gla:gemini-3-flash-preview
 GOOGLE_API_KEY=your_google_api_key
 
-# Option B: OpenAI GPT-5.2 (best reasoning)
+# Option B: OpenAI
 # LLM=openai:gpt-5.2
 # OPENAI_API_KEY=your_openai_api_key
 
@@ -81,117 +172,234 @@ GOOGLE_API_KEY=your_google_api_key
 # LLM=anthropic:claude-4-sonnet
 # ANTHROPIC_API_KEY=your_anthropic_api_key
 
-# Option D: Ollama (local/self-hosted)
+# Option D: Ollama, local or self-hosted
 # LLM=ollama:gpt-oss:20b
-# OLLAMA_BASE_URL=  # Optional; defaults to localhost locally, host.docker.internal in Docker
-# OLLAMA_API_KEY=your_ollama_api_key  # Optional (Ollama Cloud)
+# OLLAMA_BASE_URL=
+# OLLAMA_API_KEY=
 
-# Optional: Auth secret (change in production)
+# Optional: Auth secret, change this in production
 BETTER_AUTH_SECRET=change_this_in_production
 
-# Optional: DataFast analytics
-# Track your deployed domain in DataFast
+# Optional: Analytics
 # NEXT_PUBLIC_DATAFAST_WEBSITE_ID=dfid_xxxxx
 # NEXT_PUBLIC_DATAFAST_DOMAIN=your-domain.com
 # NEXT_PUBLIC_DATAFAST_ALLOW_LOCALHOST=false
 
-# Optional: Resend for waitlist confirmation emails
+# Optional: Resend email support
 # RESEND_API_KEY=your_resend_api_key
+# RESEND_FROM_EMAIL=your_verified_sender_email
 
 # Optional: YouTube metadata provider
-# `yt_dlp` preserves the existing metadata behavior
-# `youtube_data_api` uses the official API first, then falls back to yt-dlp
 # YOUTUBE_METADATA_PROVIDER=yt_dlp
 # YOUTUBE_DATA_API_KEY=your_youtube_data_api_key
+
+# Optional: Processing mode
+# DEFAULT_PROCESSING_MODE=fast
+# FAST_MODE_MAX_CLIPS=4
+# FAST_MODE_TRANSCRIPT_MODEL=nano
 ```
 
-### 2. Start the Services
+## 3. Start the Services
 
 ```bash
 docker-compose up -d
 ```
 
 This starts:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000 (docs at /docs)
-- **PostgreSQL**: localhost:5432
-- **Redis**: localhost:6379
 
-### 3. Wait for Initialization
+* Frontend: `http://localhost:3000`
+* Backend API: `http://localhost:8000`
+* API docs: `http://localhost:8000/docs`
+* PostgreSQL: `localhost:5432`
+* Redis: `localhost:6379`
 
-First-time startup takes a few minutes. Check progress with:
+## 4. Watch the Startup Logs
+
+First-time startup may take a few minutes.
 
 ```bash
 docker-compose logs -f
 ```
 
-Wait until you see health checks passing for all services.
+Wait until the frontend, backend, worker, PostgreSQL, and Redis services are healthy.
 
-### 4. Access the App
+## 5. Open the App
 
-Open http://localhost:3000 in your browser, create an account, and start clipping!
+Go to:
 
-If you enable DataFast, also verify that:
-- `/js/script.js` loads from your own app domain
-- `/api/events` requests are proxied through your app domain
-- custom goals appear after successful sign-up, sign-in, task creation, billing, feedback, or waitlist actions
+```text
+http://localhost:3000
+```
 
-### Troubleshooting
+Create an account, upload a video or paste a YouTube URL, then begin generating clips.
 
-**Backend fails to start with API key error:**
-- Make sure you've set the correct LLM provider AND its corresponding API key in `.env`
-- Default is `google-gla:gemini-3-flash-preview` which requires `GOOGLE_API_KEY`
-- If using `openai:gpt-5.2`, you MUST set `OPENAI_API_KEY`
-- If using `ollama:*`, run Ollama and optionally set `OLLAMA_BASE_URL`
-  (`http://localhost:11434/v1` for local backend runs, `http://host.docker.internal:11434/v1` for Docker)
-- Rebuild after changing `.env`: `docker-compose up -d --build`
+## Local Development
 
-**Videos stay queued / never process:**
-- Check worker logs: `docker-compose logs -f worker`
-- Ensure Redis is healthy: `docker-compose logs redis`
-- Verify API keys are correct
+For local development without Docker, review the project documentation and setup files before changing services directly.
 
-**YouTube titles or duration lookup is failing:**
-- `YOUTUBE_METADATA_PROVIDER=yt_dlp` keeps the old metadata path
-- `YOUTUBE_METADATA_PROVIDER=youtube_data_api` requires YouTube Data API v3 enabled in Google Cloud
-- Prefer `YOUTUBE_DATA_API_KEY`; if it is unset, the backend will try `GOOGLE_API_KEY`
-- The backend will automatically fall back to the other metadata provider if the primary one fails
-- `videos.list` costs 1 quota unit per request
+Common development flow:
 
-**Performance tuning (default is fast mode):**
-- `DEFAULT_PROCESSING_MODE=fast|balanced|quality`
-- `FAST_MODE_MAX_CLIPS=4` to cap clip count in fast mode
-- `FAST_MODE_TRANSCRIPT_MODEL=nano` for fastest transcript model
-- View aggregate metrics: `GET /tasks/metrics/performance`
+```bash
+docker-compose up -d
+docker-compose logs -f backend
+docker-compose logs -f worker
+docker-compose logs -f frontend
+```
 
-**Prisma errors on Windows:**
-- Run `docker-compose down -v` to clear volumes
-- Run `docker-compose up -d --build` to rebuild
+If you make environment changes, rebuild the stack:
 
-**Frontend shows database errors:**
-- Wait for PostgreSQL to fully initialize (check logs)
-- The database is automatically created on first run
+```bash
+docker-compose up -d --build
+```
 
-**Font picker is empty / cannot select or upload fonts:**
-- Add fonts to `backend/fonts/` – see [backend/fonts/README.md](backend/fonts/README.md) for TikTok Sans and custom fonts
-- Ensure `BACKEND_AUTH_SECRET` is set in `.env` when using the hosted/monetized setup
-- Font upload is Pro-only when monetization is enabled; self-hosted users can upload freely
+## Troubleshooting
 
-**Subscription emails are not sending:**
-- Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in `.env`
-- `RESEND_FROM_EMAIL` must be a verified sender/domain in your Resend account
-- The backend sends the “thank you for subscribing” email on `checkout.session.completed`
-- The backend sends the “sorry to see you go” email on `customer.subscription.deleted`
+### Backend fails to start with an API key error
+
+Check that your selected `LLM` provider matches the API key you provided.
+
+Examples:
+
+* `google-gla:*` requires `GOOGLE_API_KEY`
+* `openai:*` requires `OPENAI_API_KEY`
+* `anthropic:*` requires `ANTHROPIC_API_KEY`
+* `ollama:*` requires Ollama to be running and reachable
+
+After changing `.env`, rebuild the containers:
+
+```bash
+docker-compose up -d --build
+```
+
+### Videos stay queued and never process
+
+Check the worker logs:
+
+```bash
+docker-compose logs -f worker
+```
+
+Then verify Redis is healthy:
+
+```bash
+docker-compose logs redis
+```
+
+Also confirm that your transcription and LLM API keys are valid.
+
+### YouTube title or duration lookup fails
+
+The app can use different metadata providers.
+
+```env
+YOUTUBE_METADATA_PROVIDER=yt_dlp
+```
+
+or:
+
+```env
+YOUTUBE_METADATA_PROVIDER=youtube_data_api
+YOUTUBE_DATA_API_KEY=your_youtube_data_api_key
+```
+
+If YouTube Data API is used, make sure YouTube Data API v3 is enabled in Google Cloud.
+
+### Frontend shows database errors
+
+PostgreSQL may still be initializing.
+
+Check the logs:
+
+```bash
+docker-compose logs postgres
+```
+
+If needed, reset local volumes:
+
+```bash
+docker-compose down -v
+docker-compose up -d --build
+```
+
+### Font picker is empty
+
+Add fonts to:
+
+```text
+backend/fonts/
+```
+
+Review:
+
+```text
+backend/fonts/README.md
+```
+
+### Exports or captions fail
+
+Check:
+
+* Worker logs
+* Backend logs
+* File storage permissions
+* API key validity
+* Available disk space
+* Processing mode settings
+
+## Processing Modes
+
+THIH Clip Engine can be tuned for speed or quality.
+
+```env
+DEFAULT_PROCESSING_MODE=fast
+FAST_MODE_MAX_CLIPS=4
+FAST_MODE_TRANSCRIPT_MODEL=nano
+```
+
+Suggested modes:
+
+* `fast`, best for quick sermon and podcast review
+* `balanced`, best for routine publishing workflow
+* `quality`, best for final production assets
+
+## Recommended THIH Workflow
+
+Use this process when turning long-form content into clips:
+
+1. Upload the sermon, podcast, teaching, or strategy video.
+2. Let THIH Clip Engine transcribe and analyze the content.
+3. Review the recommended clips.
+4. Select clips based on clarity, usefulness, conviction, and platform fit.
+5. Edit captions and framing.
+6. Export platform-ready clips.
+7. Create post copy, captions, titles, and calls to action.
+8. Publish intentionally.
+9. Track what serves people, not only what performs.
+
+## Planned THIH Customizations
+
+This fork is being prepared for deeper THIH-specific workflows, including:
+
+* THIH brand canon reset
+* Sermon-specific clip scoring
+* Devotional clip mode
+* THIH Systems business content mode
+* Scripture reference suggestions
+* Caption and post copy generation
+* LinkedIn post generation
+* YouTube Shorts description generation
+* Instagram caption generation
+* Platform-specific export notes
+* Content packet generation per clip
+* Canon fit scoring
+* Stewardship scoring
+* Message integrity checks
 
 ## Testing
 
-SupoClip now has a layered automated test setup:
+This fork may inherit automated test commands from the upstream project. Verify the current test suite before treating coverage as complete.
 
-- `pytest` for backend unit and integration tests
-- `Vitest` and Testing Library for frontend route and component coverage
-- `Playwright` for a small seeded browser smoke suite
-
-Repo-level entrypoints:
+Potential repo-level commands:
 
 ```bash
 make test
@@ -201,7 +409,7 @@ make test-e2e
 make test-ci
 ```
 
-App-level entrypoints:
+Potential app-level commands:
 
 ```bash
 cd backend && uv sync --all-groups && .venv/bin/pytest
@@ -209,42 +417,100 @@ cd frontend && npm install && npm run test:coverage
 cd frontend && npm run test:e2e
 ```
 
-Local test runs expect PostgreSQL and Redis to be available. The easiest path is to start the stack with `docker-compose up -d`, then run the commands above. CI runs the same layers in GitHub Actions with Postgres and Redis service containers.
+Local test runs may require PostgreSQL and Redis.
+
+Recommended path:
+
+```bash
+docker-compose up -d
+make test
+```
+
+If tests are not fully implemented or fail because of inherited upstream drift, document the actual status clearly before production use.
+
+## Production Readiness Checklist
+
+Before connecting this to the broader THIH Ecosystem, verify:
+
+* The app builds cleanly
+* Docker Compose starts all services
+* Frontend loads successfully
+* User authentication works
+* Upload task creation works
+* YouTube task creation works
+* Redis queue processes jobs
+* Worker generates clips
+* Clip preview works
+* Captions render correctly
+* Exports complete successfully
+* Logs are understandable
+* Secrets are not committed
+* Public copy says THIH Clip Engine
+* Upstream SupoClip language remains only where attribution or license context requires it
+* Documentation matches the actual app behavior
 
 ## Documentation
 
-Detailed documentation now lives in [`docs/`](docs/README.md).
+Detailed documentation lives in:
 
-Start with:
+```text
+docs/
+```
 
-- [`docs/setup.md`](docs/setup.md)
-- [`docs/configuration.md`](docs/configuration.md)
-- [`docs/app-guide.md`](docs/app-guide.md)
-- [`docs/architecture.md`](docs/architecture.md)
-- [`docs/api-reference.md`](docs/api-reference.md)
-- [`docs/development.md`](docs/development.md)
-- [`docs/troubleshooting.md`](docs/troubleshooting.md)
+Suggested starting points:
 
-## Hosted Billing Emails
+* `docs/setup.md`
+* `docs/configuration.md`
+* `docs/app-guide.md`
+* `docs/architecture.md`
+* `docs/api-reference.md`
+* `docs/development.md`
+* `docs/troubleshooting.md`
 
-When you run SupoClip with monetization enabled (`SELF_HOST=false`), subscription lifecycle emails are sent through Resend by the backend:
+## Security Notes
 
-- `checkout.session.completed` sends the thank-you-for-subscribing email
-- `customer.subscription.deleted` sends the sorry-to-see-you-go email
+Do not commit real secrets.
 
-Required env vars for this flow:
+Keep these values private:
 
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
-- `BACKEND_AUTH_SECRET`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PRICE_ID`
+* AssemblyAI API keys
+* Google API keys
+* OpenAI API keys
+* Anthropic API keys
+* Resend API keys
+* Stripe secrets
+* Auth secrets
+* Database credentials
+* Production domain configuration
 
-### Local Development (Without Docker)
+Use `.env` for local development and your hosting provider’s secret manager for production.
 
-See [CLAUDE.md](CLAUDE.md) for detailed development instructions.
+## Upstream Attribution
+
+THIH Clip Engine is a customized fork based on SupoClip by FujiwaraChoki.
+
+The original project is released under the AGPL-3.0 License. This fork preserves the license obligations and upstream attribution while adapting the product for THIH use cases.
 
 ## License
 
-SupoClip is released under the AGPL-3.0 License. See [LICENSE](LICENSE) for details.
+This project is released under the AGPL-3.0 License.
+
+See:
+
+```text
+LICENSE
+```
+
+## Final Word
+
+THIH Clip Engine is built on a simple conviction:
+
+Your message should not be trapped inside long-form content.
+
+When a sermon, teaching, podcast, or business insight carries value, it should be clipped, clarified, and released with excellence.
+
+Not for vanity.
+
+Not for noise.
+
+For service.
