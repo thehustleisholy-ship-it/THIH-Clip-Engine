@@ -385,7 +385,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </Link>
-                  <a href="https://github.com/FujiwaraChoki/supoclip" target="_blank" rel="noopener noreferrer">
+                  <a href="https://github.com/thehustleisholy-ship-it/THIH-Clip-Engine" target="_blank" rel="noopener noreferrer">
                     <Button variant="outline" className="border-background/30 bg-transparent text-background hover:bg-background hover:text-foreground">
                       <Github className="h-4 w-4" />
                       GitHub
