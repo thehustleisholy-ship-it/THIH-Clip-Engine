@@ -1,6 +1,6 @@
 import pytest
 
-from src.api.routes.tasks import _merge_task_source_metadata
+from src.api.routes.tasks import _merge_task_source_metadata, _normalize_content_mode
 from src.services.task_service import TaskService
 
 
@@ -116,3 +116,23 @@ async def test_load_task_source_settings_accepts_speaker_pan_mode(monkeypatch):
     settings = await service._load_task_source_settings("task-123")
 
     assert settings["output_format"] == "vertical_pan"
+
+
+def test_normalize_content_mode_accepts_supported_modes_and_defaults():
+    assert _normalize_content_mode("sermon") == "sermon"
+    assert _normalize_content_mode("BUSINESS_THOUGHT_LEADERSHIP") == "business_thought_leadership"
+    assert _normalize_content_mode("unknown") == "thih_systems"
+    assert _normalize_content_mode(None) == "thih_systems"
+
+
+def test_merge_task_source_metadata_preserves_content_mode():
+    merged = _merge_task_source_metadata(
+        {},
+        source_url="upload://demo.mp4",
+        source_type="video_url",
+        output_format="vertical",
+        add_subtitles=True,
+        content_mode="teaching",
+    )
+
+    assert merged["content_mode"] == "teaching"

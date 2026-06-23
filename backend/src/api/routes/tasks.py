@@ -24,6 +24,7 @@ from ...config import get_config
 from ...font_registry import is_font_accessible
 from ...clip_cleanup import normalize_clip_cleanup_settings
 from ...video_utils import VALID_OUTPUT_FORMATS
+from ...ai import DEFAULT_CONTENT_MODE, SUPPORTED_CONTENT_MODES
 from ...admin_auth import require_admin_user
 import redis.asyncio as redis
 from ...clip_editor import export_with_preset, EXPORT_PRESETS
@@ -52,6 +53,15 @@ def _normalize_font_family(value: Any, default: str = "TikTokSans-Regular") -> s
     return default
 
 
+
+
+def _normalize_content_mode(value: Any) -> str:
+    if not value:
+        return DEFAULT_CONTENT_MODE
+    normalized = str(value).strip().lower()
+    if normalized in SUPPORTED_CONTENT_MODES:
+        return normalized
+    return DEFAULT_CONTENT_MODE
 def _get_user_id_from_headers(request: Request) -> str:
     """Get the authenticated user ID from trusted frontend headers."""
     config = get_config()
@@ -111,6 +121,7 @@ def _merge_task_source_metadata(
     output_format: Any = None,
     add_subtitles: Any = None,
     cleanup_settings: Dict[str, Any] | None = None,
+    content_mode: Any = None,
 ) -> Dict[str, Any]:
     merged = dict(existing or {})
 
@@ -124,6 +135,8 @@ def _merge_task_source_metadata(
         merged["add_subtitles"] = add_subtitles
     if cleanup_settings:
         merged.update(cleanup_settings)
+    if content_mode is not None:
+        merged["content_mode"] = _normalize_content_mode(content_mode)
 
     return merged
 
@@ -196,6 +209,7 @@ async def create_task(request: Request, db: AsyncSession = Depends(get_db)):
     add_subtitles = data.get("add_subtitles", True)
     if not isinstance(add_subtitles, bool):
         add_subtitles = True
+    content_mode = _normalize_content_mode(data.get("content_mode"))
     cleanup_settings = normalize_clip_cleanup_settings(
         data.get("cut_long_pauses"),
         data.get("pause_threshold_ms"),
@@ -246,6 +260,7 @@ async def create_task(request: Request, db: AsyncSession = Depends(get_db)):
             output_format,
             add_subtitles,
             cleanup_settings,
+            content_mode,
         )
 
         # Save source metadata for resume/retries in environments without sources.url column
@@ -258,6 +273,7 @@ async def create_task(request: Request, db: AsyncSession = Depends(get_db)):
                 output_format=output_format,
                 add_subtitles=add_subtitles,
                 cleanup_settings=cleanup_settings,
+                content_mode=content_mode,
             ),
         )
 
@@ -725,6 +741,7 @@ async def apply_task_settings(
             cleanup_settings,
         )
         metadata = await _load_task_source_metadata(task_id)
+        content_mode = _normalize_content_mode(payload.get("content_mode") or metadata.get("content_mode"))
         await _save_task_source_metadata(
             task_id,
             _merge_task_source_metadata(
@@ -738,6 +755,7 @@ async def apply_task_settings(
                     else task.get("add_subtitles")
                 ),
                 cleanup_settings=cleanup_settings,
+                content_mode=content_mode,
             ),
         )
         return {"task": task, "message": "Task settings updated"}
@@ -915,6 +933,7 @@ async def resume_task(
         processing_mode = (
             task.get("processing_mode") or runtime_config.default_processing_mode
         )
+        content_mode = _normalize_content_mode(metadata.get("content_mode"))
 
         job_id = await JobQueue.enqueue_processing_job(
             "process_video_task",
@@ -931,6 +950,7 @@ async def resume_task(
             output_format,
             add_subtitles,
             cleanup_settings,
+            content_mode,
         )
 
         return {"message": "Task resumed", "job_id": job_id}
@@ -967,3 +987,6 @@ async def list_dead_letter_tasks():
         return {"total": len(items), "tasks": items}
     finally:
         await redis_client.close()
+
+
+

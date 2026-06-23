@@ -1,10 +1,10 @@
 # Architecture
 
-This guide explains how SupoClip is structured and how a task moves through the system.
+This guide explains how THIH Clip Engine is structured and how a task moves through the system.
 
 ## High-Level System
 
-SupoClip is a multi-service application built around asynchronous video processing.
+THIH Clip Engine is a multi-service application built around asynchronous video processing.
 
 ```text
 Browser
@@ -231,7 +231,7 @@ This separation lets the browser talk to the frontend domain while the frontend 
 
 ### Authentication
 
-SupoClip uses Better Auth with Prisma and PostgreSQL.
+THIH Clip Engine uses Better Auth with Prisma and PostgreSQL.
 
 Important details:
 
@@ -370,6 +370,10 @@ Stores:
 - Selected text
 - AI reasoning
 - Virality and scoring breakdown
+- THIH scoring breakdown: opening clarity, retention strength, service value, stewardship usefulness, canon fit, conviction, platform readiness, and message integrity
+- Recommended publishing metadata: title, caption, CTA, hashtags, platform fit, scripture reference, and content warning when applicable
+
+Clip analysis supports these content modes: `sermon`, `devotional`, `podcast`, `teaching`, `testimony`, `thih_systems`, and `business_thought_leadership`. THIH scoring is the primary ranking signal; virality remains available as a secondary compatibility signal.
 
 ### `processing_cache`
 
@@ -433,3 +437,5 @@ For new work, use the refactored entry point and layered route structure.
 - [API Reference](./api-reference.md)
 - [Development](./development.md)
 - [Troubleshooting](./troubleshooting.md)
+
+

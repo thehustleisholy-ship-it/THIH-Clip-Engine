@@ -1,6 +1,6 @@
 # Troubleshooting
 
-This guide collects the most common operational issues with SupoClip and how to diagnose them.
+This guide collects the most common operational issues with THIH Clip Engine and how to diagnose them.
 
 ## Start Here
 
@@ -379,3 +379,4 @@ docker-compose up -d --build
 - [Setup](./setup.md)
 - [Configuration](./configuration.md)
 - [Architecture](./architecture.md)
+

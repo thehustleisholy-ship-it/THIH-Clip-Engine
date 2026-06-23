@@ -46,8 +46,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="SupoClip API",
-    description="Python-based backend for SupoClip",
+    title="THIH Clip Engine API",
+    description="Python-based backend for THIH Clip Engine",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -83,7 +83,7 @@ def _resolve_uploaded_video_path(url: str) -> Path:
 @app.get("/")
 def read_root():
     return {
-        "message": "This is the SupoClip FastAPI-based API. Visit /docs for the API documentation."
+        "message": "This is the THIH Clip Engine FastAPI-based API. Visit /docs for the API documentation."
     }
 
 
@@ -907,3 +907,4 @@ async def upload_video(request: Request):
     except Exception as e:
         logger.error(f"❌ Error uploading video: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error uploading video: {str(e)}")
+

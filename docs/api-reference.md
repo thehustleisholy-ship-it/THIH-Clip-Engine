@@ -1,12 +1,12 @@
 # API Reference
 
-This is a practical reference for the API surface used by SupoClip. It combines the frontend proxy routes and the backend routes they rely on.
+This is a practical reference for the API surface used by THIH Clip Engine. It combines the frontend proxy routes and the backend routes they rely on.
 
 For exact schemas and interactive testing, also use FastAPI docs at `http://localhost:8000/docs`.
 
 ## API Layers
 
-SupoClip has two relevant layers:
+THIH Clip Engine has two relevant layers:
 
 - Frontend API routes in `frontend/src/app/api`
   - These are what the browser usually calls
@@ -242,3 +242,4 @@ If a route seems broken:
 - [Architecture](./architecture.md)
 - [Development](./development.md)
 - [Troubleshooting](./troubleshooting.md)
+

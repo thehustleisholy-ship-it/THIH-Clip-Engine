@@ -1,6 +1,6 @@
 # Fonts
 
-This directory contains subtitle fonts that SupoClip can expose in the UI and use during clip rendering.
+This directory contains subtitle fonts that THIH Clip Engine can expose in the UI and use during clip rendering.
 
 ## How it works
 
@@ -24,4 +24,5 @@ This directory contains subtitle fonts that SupoClip can expose in the UI and us
 - Keep file names stable if they are already referenced by saved tasks or user defaults.
 - Large font collections can make the picker harder to use, so prefer a curated set.
 - Source and licensing notes for bundled fonts should go in [`SOURCES.md`](./SOURCES.md).
+
 

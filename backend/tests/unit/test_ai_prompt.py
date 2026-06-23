@@ -7,6 +7,7 @@ from src.ai import (
     IDEAL_CLIP_MIN_SECONDS,
     MIN_ACCEPTED_CLIP_SECONDS,
     TranscriptSegment,
+    SUPPORTED_CONTENT_MODES,
     _build_transcript_model,
     _choose_repaired_bounds,
     _extract_transcript_text,
@@ -135,3 +136,26 @@ def test_llm_validation_rejects_unsupported_or_incomplete_model_names():
         "ollama:", runtime_config
     )
     assert _get_missing_llm_key_error("ollama:gpt-oss:20b", runtime_config) is None
+
+
+def test_system_prompt_includes_thih_scoring_contract():
+    assert "THIH SCORING" in transcript_analysis_system_prompt
+    assert "opening_clarity" in transcript_analysis_system_prompt
+    assert "message_integrity" in transcript_analysis_system_prompt
+    assert "recommended_title" in transcript_analysis_system_prompt
+    assert "scripture_reference" in transcript_analysis_system_prompt
+    assert "virality is secondary" in transcript_analysis_system_prompt.lower()
+
+
+def test_build_transcript_analysis_prompt_accepts_content_modes():
+    prompt = build_transcript_analysis_prompt(
+        transcript="[00:12 - 00:42] A strong opening line about stewardship",
+        content_mode="sermon",
+    )
+
+    assert "Content mode: sermon" in prompt
+    assert "supported content modes" in prompt.lower()
+    for mode in SUPPORTED_CONTENT_MODES:
+        assert mode in prompt
+    assert "THIH scoring" in prompt
+    assert "recommended_hashtags" in prompt

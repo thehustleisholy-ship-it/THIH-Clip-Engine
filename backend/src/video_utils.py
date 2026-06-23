@@ -2261,6 +2261,16 @@ def create_clips_from_segments(
                     "value_score": segment.get("value_score", 0),
                     "shareability_score": segment.get("shareability_score", 0),
                     "hook_type": segment.get("hook_type"),
+                    "thih_score": segment.get("thih_score", 0),
+                    "thih": segment.get("thih", {}),
+                    "content_mode": segment.get("content_mode"),
+                    "recommended_title": segment.get("recommended_title"),
+                    "recommended_caption": segment.get("recommended_caption"),
+                    "recommended_cta": segment.get("recommended_cta"),
+                    "recommended_hashtags": segment.get("recommended_hashtags", []),
+                    "platform_fit": segment.get("platform_fit", []),
+                    "scripture_reference": segment.get("scripture_reference"),
+                    "content_warning": segment.get("content_warning"),
                     "keep_ranges": keep_ranges,
                 }
                 clips_info.append(clip_info)
@@ -2399,7 +2409,7 @@ def create_clips_with_transitions(
         f"Creating {len(segments)} standalone clips subtitles={add_subtitles} template '{caption_template}'"
     )
     logger.info(
-        "Inter-clip transitions are disabled for standalone SupoClip exports"
+        "Inter-clip transitions are disabled for standalone THIH Clip Engine exports"
     )
     return create_clips_from_segments(
         video_path,
@@ -2627,3 +2637,6 @@ def apply_broll_to_clip(
     except Exception as e:
         logger.error(f"Error applying B-roll to clip: {e}")
         return False
+
+
+

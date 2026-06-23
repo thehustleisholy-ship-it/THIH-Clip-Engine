@@ -31,7 +31,7 @@ from ..clip_editor import (
 )
 from ..video_utils import VALID_OUTPUT_FORMATS, parse_timestamp_to_seconds
 from ..clip_cleanup import normalize_clip_cleanup_settings
-from ..ai import TRANSCRIPT_ANALYSIS_CACHE_VERSION
+from ..ai import DEFAULT_CONTENT_MODE, TRANSCRIPT_ANALYSIS_CACHE_VERSION
 from ..clip_source_map import (
     copy_clip_source_ranges,
     load_clip_source_ranges,
@@ -43,6 +43,23 @@ from ..clip_source_map import (
 )
 
 logger = logging.getLogger(__name__)
+
+THIH_CLIP_FIELDS = (
+    "thih_score",
+    "thih",
+    "content_mode",
+    "recommended_title",
+    "recommended_caption",
+    "recommended_cta",
+    "recommended_hashtags",
+    "platform_fit",
+    "scripture_reference",
+    "content_warning",
+)
+
+
+def _thih_clip_kwargs(clip_info: Dict[str, Any]) -> Dict[str, Any]:
+    return {field: clip_info.get(field) for field in THIH_CLIP_FIELDS}
 
 
 class TaskService:
@@ -58,10 +75,16 @@ class TaskService:
         self.config = config or get_config()
 
     @staticmethod
-    def _build_cache_key(url: str, source_type: str, processing_mode: str) -> str:
+    def _build_cache_key(
+        url: str,
+        source_type: str,
+        processing_mode: str,
+        content_mode: str = DEFAULT_CONTENT_MODE,
+    ) -> str:
+        mode_part = "" if content_mode == DEFAULT_CONTENT_MODE else f"|{content_mode}"
         payload = (
             f"{source_type}|{processing_mode}|"
-            f"{TRANSCRIPT_ANALYSIS_CACHE_VERSION}|{url.strip()}"
+            f"{TRANSCRIPT_ANALYSIS_CACHE_VERSION}{mode_part}|{url.strip()}"
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -152,6 +175,7 @@ class TaskService:
         should_cancel: Optional[Callable] = None,
         clip_ready_callback: Optional[Callable] = None,
         cleanup_settings: Optional[Dict[str, Any]] = None,
+        content_mode: str = DEFAULT_CONTENT_MODE,
     ) -> Dict[str, Any]:
         """
         Process a task: download video, analyze, create clips.
@@ -161,7 +185,7 @@ class TaskService:
             logger.info(f"Starting processing for task {task_id}")
             started_at = datetime.utcnow()
             stage_timings: Dict[str, float] = {}
-            cache_key = self._build_cache_key(url, source_type, processing_mode)
+            cache_key = self._build_cache_key(url, source_type, processing_mode, content_mode)
 
             cache_entry = await self.cache_repo.get_cache(self.db, cache_key)
             cached_transcript = (
@@ -219,6 +243,7 @@ class TaskService:
                 cached_analysis_json=cached_analysis_json,
                 progress_callback=update_progress,
                 should_cancel=should_cancel,
+                content_mode=content_mode,
             )
             stage_timings["pipeline_seconds"] = round(
                 perf_counter() - pipeline_start, 3
@@ -310,6 +335,7 @@ class TaskService:
                     value_score=clip_info.get("value_score", 0),
                     shareability_score=clip_info.get("shareability_score", 0),
                     hook_type=clip_info.get("hook_type"),
+                    **_thih_clip_kwargs(clip_info),
                 )
                 await self.db.commit()
                 clip_ids.append(clip_id)
@@ -519,6 +545,7 @@ class TaskService:
         include_broll: bool,
         apply_to_existing: bool,
         cleanup_settings: Optional[Dict[str, Any]] = None,
+        content_mode: str = DEFAULT_CONTENT_MODE,
     ) -> Dict[str, Any]:
         """Update task-level settings and optionally regenerate all clips."""
         await self.task_repo.update_task_settings(
@@ -633,6 +660,7 @@ class TaskService:
                     "value_score": clip.get("value_score", 0),
                     "shareability_score": clip.get("shareability_score", 0),
                     "hook_type": clip.get("hook_type"),
+                    **_thih_clip_kwargs(clip),
                 }
             )
 
@@ -671,6 +699,7 @@ class TaskService:
                 value_score=clip_info.get("value_score", 0),
                 shareability_score=clip_info.get("shareability_score", 0),
                 hook_type=clip_info.get("hook_type"),
+                **_thih_clip_kwargs(clip_info),
             )
             clip_ids.append(clip_id)
 
@@ -774,6 +803,7 @@ class TaskService:
             value_score=clip.get("value_score", 0),
             shareability_score=clip.get("shareability_score", 0),
             hook_type=clip.get("hook_type"),
+            **_thih_clip_kwargs(clip),
         )
 
         await self.clip_repo.reorder_task_clips(self.db, task_id)
@@ -942,3 +972,5 @@ class TaskService:
                 parsed.get("filtered_words"),
             ),
         }
+
+

@@ -5,9 +5,40 @@ Clip repository - handles all database operations for generated clips.
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text as sa_text
 from typing import List, Dict, Any, Optional
+import json
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _decode_json(value: Any, fallback: Any) -> Any:
+    if value is None:
+        return fallback
+    if isinstance(value, (dict, list)):
+        return value
+    try:
+        return json.loads(value)
+    except Exception:
+        return fallback
+
+
+def _row_value(row: Any, name: str, default: Any = None) -> Any:
+    return getattr(row, name, default)
+
+
+def _clip_thih_fields(row: Any) -> Dict[str, Any]:
+    return {
+        "thih_score": _row_value(row, "thih_score", 0) or 0,
+        "thih": _decode_json(_row_value(row, "thih_json"), {}),
+        "content_mode": _row_value(row, "content_mode"),
+        "recommended_title": _row_value(row, "recommended_title"),
+        "recommended_caption": _row_value(row, "recommended_caption"),
+        "recommended_cta": _row_value(row, "recommended_cta"),
+        "recommended_hashtags": _decode_json(_row_value(row, "recommended_hashtags_json"), []),
+        "platform_fit": _decode_json(_row_value(row, "platform_fit_json"), []),
+        "scripture_reference": _row_value(row, "scripture_reference"),
+        "content_warning": _row_value(row, "content_warning"),
+    }
 
 
 class ClipRepository:
@@ -32,6 +63,16 @@ class ClipRepository:
         value_score: int = 0,
         shareability_score: int = 0,
         hook_type: Optional[str] = None,
+        thih_score: int = 0,
+        thih: Optional[Dict[str, Any]] = None,
+        content_mode: Optional[str] = None,
+        recommended_title: Optional[str] = None,
+        recommended_caption: Optional[str] = None,
+        recommended_cta: Optional[str] = None,
+        recommended_hashtags: Optional[List[str]] = None,
+        platform_fit: Optional[List[str]] = None,
+        scripture_reference: Optional[str] = None,
+        content_warning: Optional[str] = None,
     ) -> str:
         """Create a new clip record and return its ID."""
         try:
@@ -41,11 +82,15 @@ class ClipRepository:
                     (task_id, filename, file_path, start_time, end_time, duration,
                      text, relevance_score, reasoning, clip_order,
                      virality_score, hook_score, engagement_score, value_score, shareability_score, hook_type,
+                     thih_score, thih_json, content_mode, recommended_title, recommended_caption, recommended_cta,
+                     recommended_hashtags_json, platform_fit_json, scripture_reference, content_warning,
                      created_at)
                     VALUES
                     (:task_id, :filename, :file_path, :start_time, :end_time, :duration,
                      :text, :relevance_score, :reasoning, :clip_order,
                      :virality_score, :hook_score, :engagement_score, :value_score, :shareability_score, :hook_type,
+                     :thih_score, :thih_json, :content_mode, :recommended_title, :recommended_caption, :recommended_cta,
+                     :recommended_hashtags_json, :platform_fit_json, :scripture_reference, :content_warning,
                      NOW())
                     RETURNING id
                 """),
@@ -66,6 +111,16 @@ class ClipRepository:
                     "value_score": value_score,
                     "shareability_score": shareability_score,
                     "hook_type": hook_type,
+                    "thih_score": thih_score,
+                    "thih_json": json.dumps(thih or {}),
+                    "content_mode": content_mode,
+                    "recommended_title": recommended_title,
+                    "recommended_caption": recommended_caption,
+                    "recommended_cta": recommended_cta,
+                    "recommended_hashtags_json": json.dumps(recommended_hashtags or []),
+                    "platform_fit_json": json.dumps(platform_fit or []),
+                    "scripture_reference": scripture_reference,
+                    "content_warning": content_warning,
                 },
             )
         except Exception:
@@ -107,7 +162,9 @@ class ClipRepository:
                 sa_text("""
                     SELECT id, filename, file_path, start_time, end_time, duration,
                            text, relevance_score, reasoning, clip_order, created_at,
-                           virality_score, hook_score, engagement_score, value_score, shareability_score, hook_type
+                           virality_score, hook_score, engagement_score, value_score, shareability_score, hook_type,
+                           thih_score, thih_json, content_mode, recommended_title, recommended_caption, recommended_cta,
+                           recommended_hashtags_json, platform_fit_json, scripture_reference, content_warning
                     FROM generated_clips
                     WHERE task_id = :task_id
                     ORDER BY clip_order ASC
@@ -143,12 +200,13 @@ class ClipRepository:
                     "clip_order": row.clip_order,
                     "created_at": row.created_at.isoformat(),
                     "video_url": f"/tasks/{task_id}/clips/{row.id}/file",
-                    "virality_score": row.virality_score or 0,
-                    "hook_score": row.hook_score or 0,
-                    "engagement_score": row.engagement_score or 0,
-                    "value_score": row.value_score or 0,
-                    "shareability_score": row.shareability_score or 0,
-                    "hook_type": row.hook_type,
+                    "virality_score": _row_value(row, "virality_score", 0) or 0,
+                    "hook_score": _row_value(row, "hook_score", 0) or 0,
+                    "engagement_score": _row_value(row, "engagement_score", 0) or 0,
+                    "value_score": _row_value(row, "value_score", 0) or 0,
+                    "shareability_score": _row_value(row, "shareability_score", 0) or 0,
+                    "hook_type": _row_value(row, "hook_type"),
+                    **_clip_thih_fields(row),
                 }
             )
 
@@ -199,6 +257,8 @@ class ClipRepository:
                     SELECT id, task_id, filename, file_path, start_time, end_time, duration,
                            text, relevance_score, reasoning, clip_order,
                            virality_score, hook_score, engagement_score, value_score, shareability_score, hook_type,
+                           thih_score, thih_json, content_mode, recommended_title, recommended_caption, recommended_cta,
+                           recommended_hashtags_json, platform_fit_json, scripture_reference, content_warning,
                            created_at
                     FROM generated_clips
                     WHERE id = :clip_id
@@ -235,14 +295,15 @@ class ClipRepository:
             "relevance_score": row.relevance_score,
             "reasoning": row.reasoning,
             "clip_order": row.clip_order,
-            "virality_score": row.virality_score or 0,
-            "hook_score": row.hook_score or 0,
-            "engagement_score": row.engagement_score or 0,
-            "value_score": row.value_score or 0,
-            "shareability_score": row.shareability_score or 0,
-            "hook_type": row.hook_type,
+            "virality_score": _row_value(row, "virality_score", 0) or 0,
+            "hook_score": _row_value(row, "hook_score", 0) or 0,
+            "engagement_score": _row_value(row, "engagement_score", 0) or 0,
+            "value_score": _row_value(row, "value_score", 0) or 0,
+            "shareability_score": _row_value(row, "shareability_score", 0) or 0,
+            "hook_type": _row_value(row, "hook_type"),
             "created_at": row.created_at.isoformat(),
             "video_url": f"/tasks/{row.task_id}/clips/{row.id}/file",
+            **_clip_thih_fields(row),
         }
 
     @staticmethod
@@ -301,3 +362,5 @@ class ClipRepository:
                 {"clip_order": idx, "clip_id": cid},
             )
         await db.commit()
+
+

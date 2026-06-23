@@ -37,6 +37,82 @@ from ..config import get_config
 logger = logging.getLogger(__name__)
 UPLOAD_URL_PREFIX = "upload://"
 
+THIH_SEGMENT_METADATA_FIELDS = (
+    "content_mode",
+    "recommended_title",
+    "recommended_caption",
+    "recommended_cta",
+    "recommended_hashtags",
+    "platform_fit",
+    "scripture_reference",
+    "content_warning",
+)
+
+
+def _dump_model(value: Any) -> Dict[str, Any]:
+    if not value:
+        return {}
+    if hasattr(value, "model_dump"):
+        return value.model_dump()
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def _normalize_score_payload(payload: Dict[str, Any], score_keys: List[str]) -> Dict[str, Any]:
+    normalized = dict(payload or {})
+    has_all_scores = all(key in normalized for key in score_keys)
+    calculated_total = sum(int(normalized.get(key) or 0) for key in score_keys)
+    if has_all_scores and normalized.get("total_score") != calculated_total:
+        normalized["total_score"] = calculated_total
+    return normalized
+
+
+def _segment_value(segment: Any, key: str, default: Any = None) -> Any:
+    if isinstance(segment, dict):
+        return segment.get(key, default)
+    return getattr(segment, key, default)
+
+
+def build_segment_json(segment: Any) -> Dict[str, Any]:
+    """Flatten model or cached segment payloads while preserving legacy fields."""
+    virality = _normalize_score_payload(
+        _dump_model(_segment_value(segment, "virality")),
+        ["hook_score", "engagement_score", "value_score", "shareability_score"],
+    )
+    thih = _normalize_score_payload(
+        _dump_model(_segment_value(segment, "thih")),
+        [
+            "opening_clarity",
+            "retention_strength",
+            "service_value",
+            "stewardship_usefulness",
+            "canon_fit",
+            "conviction",
+            "platform_readiness",
+            "message_integrity",
+        ],
+    )
+    payload = {
+        "start_time": _segment_value(segment, "start_time"),
+        "end_time": _segment_value(segment, "end_time"),
+        "text": _segment_value(segment, "text", ""),
+        "relevance_score": _segment_value(segment, "relevance_score", 0.0),
+        "reasoning": _segment_value(segment, "reasoning", ""),
+        "virality_score": virality.get("total_score", _segment_value(segment, "virality_score", 0)),
+        "hook_score": virality.get("hook_score", _segment_value(segment, "hook_score", 0)),
+        "engagement_score": virality.get("engagement_score", _segment_value(segment, "engagement_score", 0)),
+        "value_score": virality.get("value_score", _segment_value(segment, "value_score", 0)),
+        "shareability_score": virality.get("shareability_score", _segment_value(segment, "shareability_score", 0)),
+        "hook_type": virality.get("hook_type", _segment_value(segment, "hook_type")),
+        "virality": virality,
+        "thih_score": thih.get("total_score", _segment_value(segment, "thih_score", 0)),
+        "thih": thih,
+    }
+    for field in THIH_SEGMENT_METADATA_FIELDS:
+        payload[field] = _segment_value(segment, field)
+    return payload
+
 
 class VideoService:
     """Service for video processing operations."""
@@ -113,7 +189,11 @@ class VideoService:
         return transcript
 
     @staticmethod
-    async def analyze_transcript(transcript: str, clip_signals: Optional[str] = None) -> Any:
+    async def analyze_transcript(
+        transcript: str,
+        clip_signals: Optional[str] = None,
+        content_mode: str = "thih_systems",
+    ) -> Any:
         """
         Analyze transcript with AI to find relevant segments.
         This is already async, no need to wrap.
@@ -122,6 +202,7 @@ class VideoService:
         relevant_parts = await get_most_relevant_parts_by_transcript(
             transcript,
             clip_signals=clip_signals,
+            content_mode=content_mode,
         )
         logger.info(
             f"AI analysis complete: {len(relevant_parts.most_relevant_segments)} segments found"
@@ -267,6 +348,14 @@ class VideoService:
                 "value_score": segment.get("value_score", 0),
                 "shareability_score": segment.get("shareability_score", 0),
                 "hook_type": segment.get("hook_type"),
+                **{
+                    field: segment.get(field)
+                    for field in THIH_SEGMENT_METADATA_FIELDS
+                    if field in segment
+                },
+                "thih_score": segment.get("thih_score", 0),
+                "thih": segment.get("thih", {}),
+                "virality": segment.get("virality", {}),
                 "keep_ranges": keep_ranges,
             }
         except Exception as e:
@@ -316,6 +405,7 @@ class VideoService:
         cached_analysis_json: Optional[str] = None,
         progress_callback: Optional[Callable[[int, str, str], Awaitable[None]]] = None,
         should_cancel: Optional[Callable[[], Awaitable[bool]]] = None,
+        content_mode: str = "thih_systems",
     ) -> Dict[str, Any]:
         """
         Complete video processing pipeline.
@@ -425,6 +515,7 @@ class VideoService:
                 relevant_parts = await VideoService.analyze_transcript(
                     transcript,
                     clip_signals=clip_signals,
+                    content_mode=content_mode,
                 )
 
             # Step 4: Create clips
@@ -499,3 +590,7 @@ class VideoService:
         except Exception as e:
             logger.error(f"Error in video processing pipeline: {e}")
             raise
+
+
+
+

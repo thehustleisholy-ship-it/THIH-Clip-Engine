@@ -12,7 +12,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models import Model
 from pydantic_ai.models.ollama import OllamaModel
 from pydantic_ai.providers.ollama import OllamaProvider
-from pydantic import AliasChoices, BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 
 from .config import Config, get_config
 from .runtime_settings import apply_settings_to_process_env
@@ -23,7 +23,27 @@ IDEAL_CLIP_MIN_SECONDS = 25
 IDEAL_CLIP_MAX_SECONDS = 50
 MIN_ACCEPTED_CLIP_SECONDS = 15
 MAX_ACCEPTED_CLIP_SECONDS = 60
-TRANSCRIPT_ANALYSIS_CACHE_VERSION = "longer-clips-v3-duration-repair"
+TRANSCRIPT_ANALYSIS_CACHE_VERSION = "thih-scoring-v1"
+SUPPORTED_CONTENT_MODES = (
+    "sermon",
+    "devotional",
+    "podcast",
+    "teaching",
+    "testimony",
+    "thih_systems",
+    "business_thought_leadership",
+)
+ContentMode = Literal[
+    "sermon",
+    "devotional",
+    "podcast",
+    "teaching",
+    "testimony",
+    "thih_systems",
+    "business_thought_leadership",
+]
+DEFAULT_CONTENT_MODE: ContentMode = "thih_systems"
+
 TRANSCRIPT_SPAN_RE = re.compile(
     r"^\[(?P<start>\d{1,2}:\d{2}(?::\d{2})?)\s*-\s*"
     r"(?P<end>\d{1,2}:\d{2}(?::\d{2})?)\]\s*(?P<text>.*)$"
@@ -75,8 +95,40 @@ class ViralityAnalysis(BaseModel):
     )
 
 
+
 def _default_virality_analysis() -> ViralityAnalysis:
     return ViralityAnalysis()
+
+
+class THIHAnalysis(BaseModel):
+    """THIH-specific clip quality breakdown."""
+
+    opening_clarity: int = Field(default=8, ge=0, le=10)
+    retention_strength: int = Field(default=8, ge=0, le=10)
+    service_value: int = Field(default=8, ge=0, le=10)
+    stewardship_usefulness: int = Field(default=8, ge=0, le=10)
+    canon_fit: int = Field(default=8, ge=0, le=10)
+    conviction: int = Field(default=8, ge=0, le=10)
+    platform_readiness: int = Field(default=8, ge=0, le=10)
+    message_integrity: int = Field(default=8, ge=0, le=10)
+    total_score: int = Field(default=64, ge=0, le=80)
+    reasoning: str = Field(
+        default="The model did not provide a detailed THIH scoring breakdown."
+    )
+
+    @model_validator(mode="after")
+    def _calculate_total_score(self) -> "THIHAnalysis":
+        self.total_score = (
+            self.opening_clarity
+            + self.retention_strength
+            + self.service_value
+            + self.stewardship_usefulness
+            + self.canon_fit
+            + self.conviction
+            + self.platform_readiness
+            + self.message_integrity
+        )
+        return self
 
 
 class TranscriptSegment(BaseModel):
@@ -106,7 +158,76 @@ class TranscriptSegment(BaseModel):
         default_factory=_default_virality_analysis,
         description="Detailed virality score breakdown",
     )
+    thih: THIHAnalysis = Field(
+        default_factory=THIHAnalysis,
+        validation_alias=AliasChoices("thih", "thih_analysis", "thih_scoring"),
+        description="THIH-specific score breakdown; primary selection signal.",
+    )
+    content_mode: ContentMode = Field(
+        default=DEFAULT_CONTENT_MODE,
+        description="Content mode used to calibrate THIH scoring.",
+    )
+    recommended_title: Optional[str] = Field(
+        default=None, description="Recommended short-form clip title."
+    )
+    recommended_caption: Optional[str] = Field(
+        default=None, description="Recommended social caption."
+    )
+    recommended_cta: Optional[str] = Field(
+        default=None, description="Recommended call to action."
+    )
+    recommended_hashtags: List[str] = Field(
+        default_factory=list, description="Recommended social hashtags."
+    )
+    platform_fit: List[str] = Field(
+        default_factory=lambda: ["shorts", "reels", "tiktok"],
+        description="Best platform surfaces for this clip.",
+    )
+    scripture_reference: Optional[str] = Field(
+        default=None, description="Scripture reference when directly applicable."
+    )
+    content_warning: Optional[str] = Field(
+        default=None, description="Content warning when directly applicable."
+    )
+    @field_validator("recommended_hashtags", mode="before")
+    @classmethod
+    def _coerce_hashtags(cls, value: Any) -> Any:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [part.strip() for part in value.split(",")]
+        if isinstance(value, list):
+            return [
+                tag if str(tag).startswith("#") else f"#{str(tag).strip()}"
+                for tag in value
+                if str(tag).strip()
+            ]
+        return value
 
+    @field_validator("platform_fit", mode="before")
+    @classmethod
+    def _coerce_platform_fit(cls, value: Any) -> Any:
+        if value is None:
+            return ["shorts", "reels", "tiktok"]
+        if isinstance(value, str):
+            return [part.strip().lower() for part in value.split(",") if part.strip()]
+        return value
+
+    @model_validator(mode="after")
+    def _fill_recommendation_defaults(self) -> "TranscriptSegment":
+        fallback_text = self.text.strip()
+        short_text = fallback_text[:77].rstrip() + "..." if len(fallback_text) > 80 else fallback_text
+        if not self.recommended_title:
+            self.recommended_title = short_text or "THIH Clip Engine Moment"
+        if not self.recommended_caption:
+            self.recommended_caption = short_text or "The hustle is holy when the work is stewarded well."
+        if not self.recommended_cta:
+            self.recommended_cta = "Reflect, save, and steward the next step well."
+        if not self.recommended_hashtags:
+            self.recommended_hashtags = ["#THIH", "#TheHustleIsHoly", "#ClipEngine"]
+        if not self.platform_fit:
+            self.platform_fit = ["shorts", "reels", "tiktok"]
+        return self
     @field_validator("relevance_score", mode="before")
     @classmethod
     def _coerce_percent_relevance_score(cls, value: Any) -> Any:
@@ -176,9 +297,12 @@ OUTPUT CONTRACT:
 - Return valid JSON only. Do not output Markdown, headings, bullets, prose, code fences, explanations, or commentary outside the JSON object.
 - The top-level JSON object must include: "most_relevant_segments", "summary", and "key_topics".
 - Only include "broll_opportunities" when B-roll was requested.
-- Each item in "most_relevant_segments" must include: "start_time", "end_time", "text", "relevance_score", "reasoning", and "virality".
+- Each item in "most_relevant_segments" must include: "start_time", "end_time", "text", "relevance_score", "reasoning", "content_mode", "thih", "virality", "recommended_title", "recommended_caption", "recommended_cta", "recommended_hashtags", and "platform_fit".
 - Do not use "segment" as an output field. Use "text".
+- "thih" must include: "opening_clarity", "retention_strength", "service_value", "stewardship_usefulness", "canon_fit", "conviction", "platform_readiness", "message_integrity", "total_score", and "reasoning".
 - "virality" must include: "hook_score", "engagement_score", "value_score", "shareability_score", "total_score", "hook_type", and "virality_reasoning".
+- Include "scripture_reference" when a direct scripture reference is present or clearly applicable; otherwise use null.
+- Include "content_warning" only when the selected clip warrants one; otherwise use null.
 - Every returned segment must be 15-60 seconds long. Prefer 25-50 seconds.
 
 CORE OBJECTIVES:
@@ -186,7 +310,7 @@ CORE OBJECTIVES:
 2. Focus on complete thoughts, insights, or entertaining moments
 3. Prioritize content with hooks, emotional moments, or valuable information
 4. Each segment should be engaging and worth watching
-5. Score each segment's viral potential with detailed breakdown
+5. Score each segment by THIH standards first and viral potential second
 
 GROUNDING RULES:
 1. Use only the provided transcript lines and timestamps
@@ -255,6 +379,27 @@ HOOK TYPES to identify:
 - "contrast": Before/after or problem/solution framing
 - "none": No clear hook pattern
 
+
+THIH SCORING (0-80 total, from eight 0-10 subscores):
+THIH scoring is the governing ranking signal. Virality is secondary and should never override message integrity, service value, or canon fit.
+
+1. opening_clarity: Whether the first seconds make the idea immediately understandable.
+2. retention_strength: Whether the clip sustains attention through tension, payoff, specificity, or emotional momentum.
+3. service_value: Whether the clip serves the viewer with truth, usefulness, encouragement, conviction, or practical help.
+4. stewardship_usefulness: Whether the clip helps the viewer steward work, faith, attention, resources, relationships, or calling well.
+5. canon_fit: Whether the clip fits the stated content mode and, for faith content, respects biblical/theological context.
+6. conviction: Whether the clip carries a clear, grounded point of view without hype or manipulation.
+7. platform_readiness: Whether the clip can stand alone on short-form platforms with clean boundaries and usable pacing.
+8. message_integrity: Whether the selected span preserves the speaker's meaning without distortion or missing context.
+
+Recommended metadata:
+- recommended_title should be concise, specific, and grounded in the selected span.
+- recommended_caption should be platform-ready and preserve the source message.
+- recommended_cta should invite reflection, saving, sharing, or a faithful next step without manipulative language.
+- recommended_hashtags should include 3-6 relevant hashtags.
+- platform_fit should list any of: shorts, reels, tiktok, linkedin, podcast_clip, youtube.
+- scripture_reference should be a direct reference only when present or clearly applicable.
+- content_warning should be short and only used when the clip includes sensitive material.
 B-ROLL OPPORTUNITIES:
 Identify 2-4 moments in each segment where B-roll footage could enhance the video:
 - When specific objects, places, or concepts are mentioned
@@ -289,13 +434,21 @@ SCORING AND OUTPUT RULES:
 - virality_reasoning and reasoning should cite what is actually present in the chosen span
 - summary and key_topics must also stay grounded in the transcript and should not add outside interpretation
 
-Find 2-5 compelling segments that would work well as standalone clips. Quality over quantity: choose fewer stronger segments over filling a quota. Every selected segment must be accurate, self-contained, have proper time ranges, and score high on virality metrics."""
+Find 2-5 compelling segments that would work well as standalone clips. Quality over quantity: choose fewer stronger segments over filling a quota. Every selected segment must be accurate, self-contained, have proper time ranges, score high on THIH metrics, and use virality as a secondary signal."""
 
 # Lazy-loaded agent to avoid import-time failures when API keys aren't set
 _transcript_agent: Optional[Agent[None, TranscriptAnalysis]] = None
 _transcript_agent_signature: Optional[tuple[str | None, ...]] = None
 
 SUPPORTED_LLM_PROVIDERS = {"google", "google-gla", "openai", "anthropic", "ollama"}
+
+def _normalize_content_mode(content_mode: ContentMode | str | None) -> ContentMode:
+    if not content_mode:
+        return DEFAULT_CONTENT_MODE
+    normalized = str(content_mode).strip().lower()
+    if normalized in SUPPORTED_CONTENT_MODES:
+        return normalized  # type: ignore[return-value]
+    return DEFAULT_CONTENT_MODE
 
 
 def _split_llm_name(model_name: str) -> tuple[str, str | None]:
@@ -401,9 +554,14 @@ def get_transcript_agent() -> Agent[None, TranscriptAnalysis]:
 
 
 def build_transcript_analysis_prompt(
-    transcript: str, include_broll: bool = False, clip_signals: str | None = None
+    transcript: str,
+    include_broll: bool = False,
+    clip_signals: str | None = None,
+    content_mode: ContentMode | str = DEFAULT_CONTENT_MODE,
 ) -> str:
     """Build the grounded task prompt for transcript analysis."""
+    normalized_content_mode = _normalize_content_mode(content_mode)
+    supported_modes = ", ".join(SUPPORTED_CONTENT_MODES)
     broll_instruction = ""
     if include_broll:
         broll_instruction = (
@@ -423,6 +581,9 @@ def build_transcript_analysis_prompt(
 The transcript is formatted as one line per timestamped span, for example:
 [00:12 - 00:21] Spoken text here
 [00:21 - 00:35] More spoken text here
+
+Content mode: {normalized_content_mode}
+Supported content modes: {supported_modes}
 
 Follow this workflow:
 1. Read the transcript as a sequence of timestamped spans.
@@ -452,8 +613,10 @@ JSON-only output requirements:
 - Return one valid JSON object and nothing else.
 - No Markdown, headings, bullets, code fences, or explanatory text outside JSON.
 - Top-level keys: "most_relevant_segments", "summary", "key_topics"{', "broll_opportunities"' if include_broll else ''}.
-- Segment keys: "start_time", "end_time", "text", "relevance_score", "reasoning", "virality".
+- Segment keys: "start_time", "end_time", "text", "relevance_score", "reasoning", "content_mode", "thih", "virality", "recommended_title", "recommended_caption", "recommended_cta", "recommended_hashtags", "platform_fit", "scripture_reference", "content_warning".
+- THIH scoring keys: "opening_clarity", "retention_strength", "service_value", "stewardship_usefulness", "canon_fit", "conviction", "platform_readiness", "message_integrity", "total_score", "reasoning".
 - Virality keys: "hook_score", "engagement_score", "value_score", "shareability_score", "total_score", "hook_type", "virality_reasoning".
+- THIH scoring is primary; virality is secondary.
 - Do not return segments shorter than {MIN_ACCEPTED_CLIP_SECONDS} seconds or longer than {MAX_ACCEPTED_CLIP_SECONDS} seconds.
 
 Transcript:
@@ -610,7 +773,10 @@ def _repair_segment_bounds(
 
 
 async def get_most_relevant_parts_by_transcript(
-    transcript: str, include_broll: bool = False, clip_signals: str | None = None
+    transcript: str,
+    include_broll: bool = False,
+    clip_signals: str | None = None,
+    content_mode: ContentMode | str = DEFAULT_CONTENT_MODE,
 ) -> TranscriptAnalysis:
     """Get the most relevant parts of a transcript with virality scoring and optional B-roll detection."""
     logger.info(
@@ -625,6 +791,7 @@ async def get_most_relevant_parts_by_transcript(
                 transcript=transcript,
                 include_broll=include_broll,
                 clip_signals=clip_signals,
+                content_mode=content_mode,
             )
         )
 
@@ -711,7 +878,7 @@ async def get_most_relevant_parts_by_transcript(
                     else ""
                 )
                 logger.info(
-                    f"Validated segment: {segment.start_time}-{segment.end_time} ({duration}s){virality_info}"
+                    f"Validated segment: {segment.start_time}-{segment.end_time} ({duration}s), thih={segment.thih.total_score if segment.thih else 'N/A'}{virality_info}"
                 )
 
             except (ValueError, IndexError) as e:
@@ -720,9 +887,10 @@ async def get_most_relevant_parts_by_transcript(
                 )
                 continue
 
-        # Sort by virality score (primary) then relevance (secondary)
+        # Sort by THIH score first; virality remains a secondary signal.
         validated_segments.sort(
             key=lambda x: (
+                x.thih.total_score if x.thih else 0,
                 x.virality.total_score if x.virality else 0,
                 x.relevance_score,
             ),
@@ -740,7 +908,7 @@ async def get_most_relevant_parts_by_transcript(
         if validated_segments:
             top = validated_segments[0]
             logger.info(
-                f"Top segment - relevance: {top.relevance_score:.2f}, virality: {top.virality.total_score if top.virality else 'N/A'}"
+                f"Top segment - relevance: {top.relevance_score:.2f}, thih: {top.thih.total_score if top.thih else 'N/A'}, virality: {top.virality.total_score if top.virality else 'N/A'}"
             )
 
         return final_analysis
@@ -753,3 +921,9 @@ async def get_most_relevant_parts_by_transcript(
 def get_most_relevant_parts_sync(transcript: str) -> TranscriptAnalysis:
     """Synchronous wrapper for the async function."""
     return asyncio.run(get_most_relevant_parts_by_transcript(transcript))
+
+
+
+
+
+

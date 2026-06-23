@@ -1,4 +1,4 @@
--- Database initialization script for SupoClip
+-- Database initialization script for THIH Clip Engine
 -- Create database schema with required tables
 
 -- Enable UUID extension for generating UUIDs
@@ -96,6 +96,17 @@ CREATE TABLE generated_clips (
     shareability_score INTEGER DEFAULT 0,
     hook_type VARCHAR(50),
 
+    -- THIH scoring and recommended publishing metadata
+    thih_score INTEGER DEFAULT 0,
+    thih_json TEXT,
+    content_mode VARCHAR(50),
+    recommended_title TEXT,
+    recommended_caption TEXT,
+    recommended_cta TEXT,
+    recommended_hashtags_json TEXT,
+    platform_fit_json TEXT,
+    scripture_reference VARCHAR(255),
+    content_warning TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -215,3 +226,5 @@ CREATE TRIGGER update_app_settings_updated_at BEFORE UPDATE ON app_settings FOR 
 CREATE TRIGGER update_session_updatedAt BEFORE UPDATE ON session FOR EACH ROW EXECUTE FUNCTION update_updatedAt_column();
 CREATE TRIGGER update_account_updatedAt BEFORE UPDATE ON account FOR EACH ROW EXECUTE FUNCTION update_updatedAt_column();
 CREATE TRIGGER update_verification_updatedAt BEFORE UPDATE ON verification FOR EACH ROW EXECUTE FUNCTION update_updatedAt_column();
+
+

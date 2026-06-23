@@ -57,7 +57,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         """Application lifespan: startup and shutdown events."""
-        logger.info("🚀 Starting SupoClip API...")
+        logger.info("🚀 Starting THIH Clip Engine API...")
         try:
             await init_db()
             logger.info("✅ Database initialized")
@@ -70,14 +70,14 @@ def create_app(
 
             yield
         finally:
-            logger.info("🛑 Shutting down SupoClip API...")
+            logger.info("🛑 Shutting down THIH Clip Engine API...")
             await close_db()
             await queue_adapter.close_pool()
             logger.info("✅ Cleanup complete")
 
     app = FastAPI(
-        title="SupoClip API",
-        description="Refactored Python backend for SupoClip with async job processing",
+        title="THIH Clip Engine API",
+        description="Python-based backend for THIH Clip Engine",
         version="0.2.0",
         lifespan=lifespan,
     )
@@ -178,7 +178,7 @@ def create_app(
     def read_root():
         """Root endpoint."""
         return {
-            "name": "SupoClip API",
+            "name": "THIH Clip Engine API",
             "version": "0.2.0",
             "status": "running",
             "docs": "/docs",
@@ -223,3 +223,4 @@ def create_app(
 
 
 app = create_app()
+

@@ -76,7 +76,7 @@ class Config:
         )
         self.resend_api_key = self._get_optional_env("RESEND_API_KEY")
         self.resend_from_email = os.getenv(
-            "RESEND_FROM_EMAIL", "SupoClip <onboarding@resend.dev>"
+            "RESEND_FROM_EMAIL", "THIH Clip Engine <onboarding@your-domain.com>"
         )
         self.app_base_url = (
             self._get_optional_env("NEXT_PUBLIC_APP_URL") or "http://localhost:3107"
@@ -196,3 +196,4 @@ def get_config() -> Config:
 def set_config_override(config: Config | None) -> None:
     global _config_override
     _config_override = config
+

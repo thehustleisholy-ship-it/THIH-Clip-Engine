@@ -63,7 +63,7 @@ Set these env vars when using hosted billing:
 
 ```
 RESEND_API_KEY=your_resend_api_key
-RESEND_FROM_EMAIL="SupoClip <onboarding@your-domain.com>"
+RESEND_FROM_EMAIL="THIH Clip Engine <onboarding@your-domain.com>"
 ```
 
 Notes:
@@ -113,3 +113,4 @@ Notes:
 - `videos.list` costs 1 quota unit per request in the YouTube Data API.
 - The public API does not expose some `yt-dlp`-specific metadata fields like `format_id`, `resolution`, `fps`, or file size.
 - Enable the YouTube Data API v3 for your Google Cloud project before using this mode.
+

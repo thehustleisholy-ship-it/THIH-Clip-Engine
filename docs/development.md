@@ -1,6 +1,6 @@
 # Development
 
-This guide is for contributors working on SupoClip locally.
+This guide is for contributors working on THIH Clip Engine locally.
 
 ## Repository Layout
 
@@ -320,3 +320,4 @@ docker-compose logs -f redis
 - [Architecture](./architecture.md)
 - [API Reference](./api-reference.md)
 - [Troubleshooting](./troubleshooting.md)
+

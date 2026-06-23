@@ -255,6 +255,20 @@ class GeneratedClip(Base):
     )
     hook_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
+    # THIH score breakdown and recommended publishing metadata
+    thih_score: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, server_default=sql_text("'0'")
+    )
+    thih_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content_mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    recommended_title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    recommended_caption: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    recommended_cta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    recommended_hashtags_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    platform_fit_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    scripture_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    content_warning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -281,3 +295,4 @@ class ProcessingCache(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
