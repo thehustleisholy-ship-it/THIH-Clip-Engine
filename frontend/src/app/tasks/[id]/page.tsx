@@ -773,7 +773,7 @@ export default function TaskPage() {
                   </span>
                 ) : task.status === "processing" ? (
                   <div className="relative group">
-                    <Badge className="bg-blue-100 text-blue-800 cursor-default shimmer">Processing</Badge>
+                    <Badge className="bg-yellow-100 text-yellow-900 cursor-default shimmer">Processing</Badge>
                     <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md opacity-0 scale-95 transition-all group-hover:opacity-100 group-hover:scale-100 pointer-events-none">
                       🔍&nbsp;&nbsp;We&apos;re currently processing your video. Check back in a couple minutes.
                     </div>
@@ -964,8 +964,8 @@ export default function TaskPage() {
                 </>
               ) : (
                 <>
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Clock className="w-8 h-8 text-blue-500 animate-pulse" />
+                  <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Clock className="w-8 h-8 text-yellow-600 animate-pulse" />
                   </div>
                   <h2 className="text-xl font-semibold text-black mb-2">Still Generating...</h2>
                   <p className="text-gray-600">

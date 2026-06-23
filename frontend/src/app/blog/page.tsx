@@ -1,25 +1,25 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Captions, Clock, ExternalLink, Github, ScanFace, Sparkles, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { HOSTED_APP_URL, blogPosts, getSiteUrl } from "@/lib/blog-posts";
+import { thihBrand } from "@/lib/thih-brand";
 
 export const metadata: Metadata = {
-  title: "SupoClip Blog | AI Video Clipping Guides",
+  title: `${thihBrand.appName} Blog | AI Video Clipping Guides`,
   description:
-    "SEO guides, product comparisons, and creator workflows for turning long-form video into social-ready shorts with SupoClip.",
+    "SEO guides, product comparisons, and creator workflows for turning long-form video into social-ready shorts with THIH Clip Engine.",
   alternates: {
     canonical: `${getSiteUrl()}/blog`,
   },
   openGraph: {
-    title: "SupoClip Blog",
+    title: `${thihBrand.appName} Blog`,
     description:
       "Guides and comparisons for AI video clipping, auto captions, vertical reframing, and short-form video workflows.",
     type: "website",
     url: `${getSiteUrl()}/blog`,
-    siteName: "SupoClip",
+    siteName: thihBrand.appName,
   },
 };
 
@@ -31,12 +31,12 @@ export default function BlogIndexPage() {
       <header className="border-b bg-background/95">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2.5">
-            <Image src="/logo.png" alt="SupoClip" width={24} height={24} className="rounded-lg" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-black text-xs font-black text-yellow-500">TH</div>
             <span
               className="text-lg font-bold tracking-tight"
               style={{ fontFamily: "var(--font-syne), var(--font-geist-sans), system-ui" }}
             >
-              SupoClip
+              {thihBrand.headerDisplay}
             </span>
           </Link>
           <div className="flex items-center gap-2">
@@ -63,7 +63,7 @@ export default function BlogIndexPage() {
             <a href={HOSTED_APP_URL} target="_blank" rel="noopener noreferrer">
               <Badge variant="outline" className="gap-2">
                 <ExternalLink className="h-3.5 w-3.5" />
-                Try hosted SupoClip
+                Try hosted app
               </Badge>
             </a>
           </div>

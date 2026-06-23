@@ -87,9 +87,9 @@ const STATUS_CONFIG: Record<
   },
   processing: {
     label: "Processing",
-    dotClass: "bg-blue-500 animate-pulse",
-    bgClass: "bg-blue-50 border-blue-200/60",
-    textClass: "text-blue-800",
+    dotClass: "bg-yellow-600 animate-pulse",
+    bgClass: "bg-yellow-50 border-yellow-300/60",
+    textClass: "text-yellow-900",
   },
   queued: {
     label: "Queued",
@@ -417,8 +417,8 @@ export default function ListPage() {
                   </span>
                 )}
                 {activeCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/60 px-2.5 py-1 text-xs font-medium text-blue-800">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-50 border border-yellow-300/60 px-2.5 py-1 text-xs font-medium text-yellow-900">
+                    <span className="h-1.5 w-1.5 rounded-full bg-yellow-600 animate-pulse" />
                     {activeCount} active
                   </span>
                 )}

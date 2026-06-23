@@ -29,7 +29,7 @@ function sourceBadge(setting: RuntimeSetting) {
     return <Badge className="bg-black text-white">Environment</Badge>;
   }
   if (setting.source === "admin") {
-    return <Badge className="bg-blue-100 text-blue-800">Admin setting</Badge>;
+    return <Badge className="bg-yellow-100 text-yellow-900">Admin setting</Badge>;
   }
   return <Badge variant="outline">Unset</Badge>;
 }

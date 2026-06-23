@@ -6,6 +6,7 @@ import { DataFastIdentity } from "@/components/datafast-identity";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { FeedbackButton } from "@/components/feedback-button";
+import { thihBrand } from "@/lib/thih-brand";
 
 const defaultMetadataBase = "http://localhost:3107";
 
@@ -39,22 +40,22 @@ const shouldTrackLocalhost = process.env.NEXT_PUBLIC_DATAFAST_ALLOW_LOCALHOST ==
 const isDataFastEnabled = Boolean(dataFastWebsiteId && dataFastDomain);
 
 export const metadata: Metadata = {
-  title: "SupoClip",
-  description: "Turn long videos into viral-ready shorts.",
+  title: thihBrand.appName,
+  description: thihBrand.description,
   metadataBase: getMetadataBase(),
   icons: {
-    icon: "/icon.png",
+    icon: "/icon.svg",
   },
   openGraph: {
-    title: "SupoClip",
-    description: "Turn long videos into viral-ready shorts.",
-    siteName: "SupoClip",
+    title: thihBrand.appName,
+    description: thihBrand.description,
+    siteName: thihBrand.appName,
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "SupoClip",
-    description: "Turn long videos into viral-ready shorts.",
+    title: thihBrand.appName,
+    description: thihBrand.description,
   },
 };
 

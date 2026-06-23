@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,8 +29,9 @@ import {
 } from "lucide-react";
 import { isLandingOnlyModeEnabled } from "@/lib/app-flags";
 import { getPublicBillingPlans } from "@/lib/billing-plans";
+import { thihBrand } from "@/lib/thih-brand";
 
-const HOSTED_APP_URL = "https://supoclip.com";
+const HOSTED_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "/";
 
 function ScrollReveal({
   children,
@@ -200,13 +200,7 @@ export default function LandingPage() {
       >
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <Image
-              src="/logo.png"
-              alt="SupoClip"
-              width={24}
-              height={24}
-              className="rounded-lg transition-transform group-hover:scale-105"
-            />
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-black text-xs font-black text-yellow-500 transition-transform group-hover:scale-105">TH</div>
             <span
               className="text-lg font-bold tracking-tight"
               style={{
@@ -214,7 +208,7 @@ export default function LandingPage() {
                   "var(--font-syne), var(--font-geist-sans), system-ui",
               }}
             >
-              SupoClip
+              {thihBrand.headerDisplay}
             </span>
           </Link>
 
@@ -361,7 +355,7 @@ export default function LandingPage() {
                 style={{ animation: "landing-fade-in-up 0.6s ease-out both" }}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                Open Source & Self-Hostable
+                THIH Systems
               </Badge>
 
               <h1
@@ -397,7 +391,7 @@ export default function LandingPage() {
                 {authEnabled ? (
                   <Link href="/sign-up">
                     <Button size="lg" className="px-8 h-12 text-sm">
-                      Start Clipping
+                      Start Creating
                       <ArrowRight className="w-4 h-4" />
                     </Button>
                   </Link>
@@ -825,7 +819,7 @@ export default function LandingPage() {
             className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-6"
             style={{ fontFamily: "var(--font-syne), system-ui" }}
           >
-            Ready to clip?
+            Ready to build with purpose?
           </h2>
           <p className="text-base text-muted-foreground mb-8">
             Turn your next video into scroll-stopping shorts. Free, open source,
@@ -834,7 +828,7 @@ export default function LandingPage() {
           {authEnabled ? (
             <Link href="/sign-up">
               <Button size="lg" className="px-10 h-12 text-sm">
-                Get Started Free
+                Get Started
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
@@ -854,18 +848,12 @@ export default function LandingPage() {
       <footer className="border-t py-8 px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Image
-              src="/logo.png"
-              alt="SupoClip"
-              width={24}
-              height={24}
-              className="rounded-md"
-            />
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-black text-xs font-black text-yellow-500">TH</div>
             <span
               className="text-sm font-semibold"
               style={{ fontFamily: "var(--font-syne), system-ui" }}
             >
-              SupoClip
+              {thihBrand.headerDisplay}
             </span>
           </div>
           <div className="flex items-center gap-6 text-xs text-muted-foreground">

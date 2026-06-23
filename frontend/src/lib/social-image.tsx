@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { thihBrand } from "@/lib/thih-brand";
 
 const FONT_SOURCES = [
   {
@@ -74,7 +75,7 @@ export async function createSocialImageResponse() {
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          background: "linear-gradient(145deg, #f5f5f0 0%, #e8e8e3 50%, #ddddd8 100%)",
+          background: `linear-gradient(145deg, ${thihBrand.colors.white} 0%, #f5f5f5 50%, ${thihBrand.colors.silver} 100%)`,
           position: "relative",
           overflow: "hidden",
         }}
@@ -133,7 +134,7 @@ export async function createSocialImageResponse() {
               width: 88,
               height: 88,
               borderRadius: 20,
-              background: "linear-gradient(135deg, #3a3a38 0%, #2a2a28 100%)",
+              background: `linear-gradient(135deg, ${thihBrand.colors.black} 0%, ${thihBrand.colors.charcoal} 100%)`,
               boxShadow: "0 8px 32px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1)",
             }}
           >
@@ -142,7 +143,7 @@ export async function createSocialImageResponse() {
               height="48"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#f5f5f0"
+              stroke={thihBrand.colors.gold}
               strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -160,20 +161,20 @@ export async function createSocialImageResponse() {
               display: "flex",
               alignItems: "baseline",
               fontFamily: "Syne",
-              fontSize: 72,
+              fontSize: 62,
               fontWeight: 800,
-              color: "#1c1c1a",
-              letterSpacing: "-2px",
+              color: thihBrand.colors.black,
+              letterSpacing: 0,
               lineHeight: 1,
             }}
           >
-            Supo
+            THIH
             <span
               style={{
-                color: "#6b6b67",
+                color: thihBrand.colors.gold,
               }}
             >
-              Clip
+              {" | Clip Engine"}
             </span>
           </div>
 
@@ -182,12 +183,12 @@ export async function createSocialImageResponse() {
               display: "flex",
               fontFamily: "Geist",
               fontSize: 26,
-              color: "#78786f",
-              letterSpacing: "-0.3px",
+              color: thihBrand.colors.charcoal,
+              letterSpacing: 0,
               lineHeight: 1,
             }}
           >
-            Turn long videos into viral-ready shorts
+            {thihBrand.description}
           </div>
 
           <div
@@ -197,7 +198,7 @@ export async function createSocialImageResponse() {
               marginTop: 8,
             }}
           >
-            {["AI-Powered", "Auto Subtitles", "9:16 Vertical", "Open Source"].map(
+            {[thihBrand.division, thihBrand.handle, thihBrand.template, "Purpose-built clips"].map(
               (label) => (
                 <div
                   key={label}
@@ -210,8 +211,8 @@ export async function createSocialImageResponse() {
                     border: "1px solid rgba(0,0,0,0.08)",
                     fontFamily: "Geist",
                     fontSize: 15,
-                    color: "#4a4a46",
-                    letterSpacing: "-0.2px",
+                    color: thihBrand.colors.charcoal,
+                    letterSpacing: 0,
                   }}
                 >
                   {label}
@@ -228,7 +229,7 @@ export async function createSocialImageResponse() {
             left: 0,
             right: 0,
             height: 4,
-            background: "linear-gradient(90deg, #3a3a38 0%, #6b6b67 50%, #3a3a38 100%)",
+            background: `linear-gradient(90deg, ${thihBrand.colors.black} 0%, ${thihBrand.colors.gold} 50%, ${thihBrand.colors.black} 100%)`,
             display: "flex",
           }}
         />

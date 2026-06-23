@@ -17,11 +17,11 @@ import { formatBillingPlanName, isPaidBillingPlan } from "@/lib/billing-plans";
 import { track } from "@/lib/datafast";
 import { formatSupportMessage, parseApiError } from "@/lib/api-error";
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight, Youtube, CheckCircle, AlertCircle, Loader2, Palette, Type, Paintbrush, Film, Sparkles, Upload, Monitor, Menu, X, LogOut, List, Shield, Settings } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import LandingPage from "@/components/landing-page";
 import { isLandingOnlyModeEnabled } from "@/lib/app-flags";
+import { thihBrand } from "@/lib/thih-brand";
 
 interface LatestTask {
   id: string;
@@ -472,11 +472,11 @@ export default function Home() {
 
   const getStepIcon = (step: string) => {
     const iconMap: Record<string, React.ReactElement> = {
-      validation: <Loader2 className="w-4 h-4 animate-spin text-blue-500" />,
-      user_check: <Loader2 className="w-4 h-4 animate-spin text-blue-500" />,
-      source_analysis: <Loader2 className="w-4 h-4 animate-spin text-blue-500" />,
+      validation: <Loader2 className="w-4 h-4 animate-spin text-yellow-600" />,
+      user_check: <Loader2 className="w-4 h-4 animate-spin text-yellow-600" />,
+      source_analysis: <Loader2 className="w-4 h-4 animate-spin text-yellow-600" />,
       youtube_info: <Youtube className="w-4 h-4 text-red-500" />,
-      database_save: <Loader2 className="w-4 h-4 animate-spin text-blue-500" />,
+      database_save: <Loader2 className="w-4 h-4 animate-spin text-yellow-600" />,
       download: <Loader2 className="w-4 h-4 animate-spin text-green-500" />,
       transcript: <Loader2 className="w-4 h-4 animate-spin text-purple-500" />,
       ai_analysis: <Loader2 className="w-4 h-4 animate-spin text-orange-500" />,
@@ -619,14 +619,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <Image
-                src="/logo.png"
-                alt="SupoClip"
-                width={24}
-                height={24}
-                className="rounded-lg"
-              />
-              <h1 className="text-xl font-bold text-black">SupoClip</h1>
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-black text-xs font-black text-yellow-500">TH</div>
+              <h1 className="text-xl font-bold text-black">{thihBrand.headerDisplay}</h1>
             </div>
 
             {/* Desktop nav */}
@@ -858,7 +852,7 @@ export default function Home() {
                     Completed
                   </Badge>
                 ) : latestTask.status === "processing" ? (
-                  <Badge className="bg-blue-100 text-blue-800 text-xs">
+                  <Badge className="bg-yellow-100 text-yellow-900 text-xs">
                     <Loader2 className="w-3 h-3 animate-spin" />
                     Processing
                   </Badge>
@@ -904,7 +898,7 @@ export default function Home() {
                   <AlertCircle className="h-4 w-4 text-amber-600" />
                   <AlertDescription className="text-sm text-amber-900">
                     <span className="font-medium">{generationGateMessage}</span>{" "}
-                    Free accounts can browse SupoClip, but video generation requires a paid plan.
+                    Free accounts can browse THIH Clip Engine, but video generation requires a paid plan.
                     <Link href="/settings" className="ml-1 font-semibold underline underline-offset-2">
                       Upgrade in settings
                     </Link>.
@@ -1044,7 +1038,7 @@ export default function Home() {
                   {/* Output format */}
                   <div className="flex items-center justify-between gap-4 p-3 border rounded-lg bg-stone-50">
                     <div className="flex min-w-0 items-center gap-3">
-                      <Monitor className="w-4 h-4 text-blue-500" />
+                      <Monitor className="w-4 h-4 text-yellow-600" />
                       <div>
                         <h3 className="text-sm font-medium text-stone-900">Framing</h3>
                         <p className="text-xs text-stone-500">Choose how clips are reframed for social video</p>
@@ -1276,7 +1270,7 @@ export default function Home() {
                             />
                           </div>
                           <div className="flex gap-1.5 mt-1">
-                            {["#FFFFFF", "#000000", "#FFD700", "#FF6B6B", "#4ECDC4", "#45B7D1"].map((color) => (
+                            {[thihBrand.colors.white, thihBrand.colors.black, thihBrand.colors.gold, thihBrand.colors.silver, thihBrand.colors.charcoal, thihBrand.colors.neutralGray].map((color) => (
                               <button
                                 key={color}
                                 type="button"
@@ -1319,7 +1313,7 @@ export default function Home() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className={`flex items-center gap-2 p-2 rounded-lg ${currentStep === 'validation' || currentStep === 'user_check' ? 'bg-blue-100' : progress > 15 ? 'bg-green-100' : 'bg-stone-100'}`}>
+                        <div className={`flex items-center gap-2 p-2 rounded-lg ${currentStep === 'validation' || currentStep === 'user_check' ? 'bg-yellow-100' : progress > 15 ? 'bg-green-100' : 'bg-stone-100'}`}>
                           <CheckCircle className={`w-3 h-3 ${progress > 15 ? 'text-green-500' : 'text-stone-400'}`} />
                           <span className={progress > 15 ? 'text-green-700' : 'text-stone-600'}>Validation</span>
                         </div>
@@ -1508,22 +1502,25 @@ export default function Home() {
                           }}
                           className="font-bold"
                         >
-                          Your subtitle will look like this
+                          {thihBrand.preview.title}
                         </p>
                       </div>
                     </div>
 
                     {/* Bottom left — creator info */}
                     <div className="absolute left-3 z-10 max-w-[60%]" style={{ bottom: "110px" }}>
-                      <p className="text-white text-xs font-bold mb-1">@creator_name</p>
+                      <p className="text-white text-xs font-bold mb-1">{thihBrand.handle}</p>
                       <p className="text-white/80 text-[10px] leading-snug">
-                        Check out this amazing clip generated by AI
+                        {thihBrand.preview.line}
+                      </p>
+                      <p className="mt-1 text-white/70 text-[9px] leading-snug">
+                        {thihBrand.preview.caption}
                       </p>
                       <div className="flex items-center gap-1.5 mt-2">
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="white" className="opacity-70">
                           <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
                         </svg>
-                        <span className="text-white/70 text-[9px]">Original Sound - creator_name</span>
+                        <span className="text-white/70 text-[9px]">{`Original Sound - ${thihBrand.preview.source}`}</span>
                       </div>
                     </div>
 
@@ -1589,7 +1586,7 @@ export default function Home() {
                   <div className="flex items-center justify-between text-xs text-stone-500">
                     <span>Template</span>
                     <span className="text-stone-700 font-medium">
-                      {availableTemplates.find(t => t.id === captionTemplate)?.name || "Default"}
+                      {availableTemplates.find(t => t.id === captionTemplate)?.name || thihBrand.template}
                     </span>
                   </div>
                 </div>

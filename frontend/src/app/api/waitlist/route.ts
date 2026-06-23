@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { thihBrand } from "@/lib/thih-brand";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -24,11 +25,11 @@ export async function POST(request: NextRequest) {
     const resend = new Resend(resendApiKey);
 
     const { error } = await resend.emails.send({
-      from: "SupoClip <noreply@shiori.ai>",
+      from: `${thihBrand.appName} <noreply@shiori.ai>`,
       to: [normalizedEmail],
-      subject: "Welcome to the SupoClip waitlist",
+      subject: `Welcome to the ${thihBrand.appName} waitlist`,
       html: `
-        <p>Thanks for joining the SupoClip waitlist.</p>
+        <p>Thanks for joining the ${thihBrand.appName} waitlist.</p>
         <p>We will email you when early access is available.</p>
       `,
     });
