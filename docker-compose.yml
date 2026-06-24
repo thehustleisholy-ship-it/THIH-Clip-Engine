@@ -114,7 +114,7 @@ services:
       - PRO_PLAN_TASK_LIMIT=${PRO_PLAN_TASK_LIMIT:-50}
       - SCALE_PLAN_TASK_LIMIT=${SCALE_PLAN_TASK_LIMIT:-300}
       - RESEND_API_KEY=${RESEND_API_KEY}
-      - "RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-SupoClip <onboarding@resend.dev>}"
+      - "RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-THIH Clip Engine <onboarding@your-domain.com>}"
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3107}
       - DISCORD_FEEDBACK_WEBHOOK_URL=${DISCORD_FEEDBACK_WEBHOOK_URL}
       - DISCORD_SALES_WEBHOOK_URL=${DISCORD_SALES_WEBHOOK_URL}
@@ -181,7 +181,7 @@ services:
       - PRO_PLAN_TASK_LIMIT=${PRO_PLAN_TASK_LIMIT:-50}
       - SCALE_PLAN_TASK_LIMIT=${SCALE_PLAN_TASK_LIMIT:-300}
       - RESEND_API_KEY=${RESEND_API_KEY}
-      - "RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-SupoClip <onboarding@resend.dev>}"
+      - "RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-THIH Clip Engine <onboarding@your-domain.com>}"
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3107}
     restart: unless-stopped
     extra_hosts:
@@ -252,3 +252,4 @@ volumes:
 networks:
   default:
     name: supoclip-network
+
