@@ -200,6 +200,10 @@ export default function TaskPage() {
         setProjectPauseThresholdMs(String(taskData.pause_threshold_ms || 900));
         setProjectRemoveFillerWords(Boolean(taskData.remove_filler_words));
         setProjectFilteredWords((taskData.filtered_words || []).join(", "));
+        if (typeof taskData.progress === "number") {
+          setProgress(taskData.progress);
+        }
+        setProgressMessage(taskData.progress_message || "");
 
         // Fetch clips if task is completed or processing (incremental clips)
         if (taskData.status === "completed" || taskData.status === "processing") {
@@ -286,6 +290,15 @@ export default function TaskPage() {
     };
     void loadTemplates();
   }, [apiUrl]);
+  useEffect(() => {
+    if (task?.status !== "queued" && task?.status !== "processing") return;
+
+    const intervalId = window.setInterval(() => {
+      void fetchTaskStatus();
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [fetchTaskStatus, task?.status]);
 
   // SSE effect - real-time progress updates
   useEffect(() => {
@@ -305,8 +318,15 @@ export default function TaskPage() {
       setProgress(data.progress || 0);
       setProgressMessage(data.message || "");
 
-      if (data.status === "completed") {
-        void fetchTaskStatus().then(() => triggerAutoRefresh());
+      if (data.status) {
+        setTask((currentTask) => (currentTask ? { ...currentTask, status: data.status } : currentTask));
+      }
+
+      if (data.status === "completed" || data.status === "error") {
+        void fetchTaskStatus().then(() => {
+          if (data.status === "completed") triggerAutoRefresh();
+        });
+        eventSource.close();
       }
     });
 
@@ -320,8 +340,11 @@ export default function TaskPage() {
       if (data.status) {
         setTask((currentTask) => (currentTask ? { ...currentTask, status: data.status } : currentTask));
 
-        if (data.status === "completed") {
-          void fetchTaskStatus().then(() => triggerAutoRefresh());
+        if (data.status === "completed" || data.status === "error") {
+          void fetchTaskStatus().then(() => {
+            if (data.status === "completed") triggerAutoRefresh();
+          });
+          eventSource.close();
         }
       }
     });
@@ -342,12 +365,13 @@ export default function TaskPage() {
 
     eventSource.addEventListener("close", async (e) => {
       const data = JSON.parse(e.data);
-      console.log("✅ Task completed:", data.status);
+      console.log("✅ Task terminal status:", data.status);
       eventSource.close();
 
-      // Refresh task and clips
       await fetchTaskStatus();
-      triggerAutoRefresh();
+      if (data.status === "completed") {
+        triggerAutoRefresh();
+      }
     });
 
     eventSource.addEventListener("error", (e) => {
@@ -786,12 +810,20 @@ export default function TaskPage() {
                   </Badge>
                 )}
                 {task.status === "completed" && clips.length > 0 && (
-                  <Link href={`/tasks/${task.id}/edit`}>
-                    <Button size="sm" variant="outline">
-                      <Clapperboard className="w-4 h-4" />
-                      Open Editor
-                    </Button>
-                  </Link>
+                  <>
+                    <Link href={`/tasks/${task.id}/shorts-factory`}>
+                      <Button size="sm" className="bg-black text-white hover:bg-neutral-800">
+                        <Scissors className="w-4 h-4" />
+                        Shorts Factory
+                      </Button>
+                    </Link>
+                    <Link href={`/tasks/${task.id}/edit`}>
+                      <Button size="sm" variant="outline">
+                        <Clapperboard className="w-4 h-4" />
+                        Open Editor
+                      </Button>
+                    </Link>
+                  </>
                 )}
                 {(task.status === "queued" || task.status === "processing") && (
                   <Button
@@ -933,7 +965,12 @@ export default function TaskPage() {
                 <AlertCircle className="w-12 h-12 mx-auto mb-2" />
                 <h2 className="text-xl font-semibold">Processing Failed</h2>
               </div>
-              <p className="text-gray-600 mb-4">There was an error processing your video. Please try again.</p>
+              <p className="text-gray-600 mb-3">There was an error processing your video.</p>
+              {task.progress_message && (
+                <p className="mx-auto mb-4 max-w-2xl rounded border border-red-100 bg-red-50 px-4 py-3 text-left text-sm text-red-900">
+                  {task.progress_message}
+                </p>
+              )}
               <Link href="/">
                 <Button>
                   <ArrowLeft className="w-4 h-4" />

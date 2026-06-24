@@ -101,6 +101,20 @@ def test_cache_key_includes_analysis_prompt_version():
     assert cache_key == expected
 
 
+def test_cache_key_changes_when_selection_instructions_change():
+    url = "https://www.youtube.com/watch?v=demo"
+    base_key = TaskService._build_cache_key(url, "youtube", "fast", "sermon")
+    instructed_key = TaskService._build_cache_key(
+        url,
+        "youtube",
+        "fast",
+        "sermon",
+        "Prioritize Romans 12:2 practical application moments.",
+    )
+
+    assert instructed_key != base_key
+
+
 @pytest.mark.asyncio
 async def test_process_task_fails_when_no_clip_segments_are_selected():
     service = build_task_service()
@@ -375,3 +389,28 @@ async def test_process_task_skips_completion_email_when_already_sent(monkeypatch
 
     send_task_completed_email.assert_not_awaited()
     service.task_repo.mark_completion_notification_sent.assert_not_awaited()
+
+@pytest.mark.asyncio
+async def test_process_task_persists_partial_transcript_when_analysis_fails():
+    service = build_task_service()
+
+    async def fail_after_transcript(**kwargs):
+        await kwargs["cache_transcript_callback"]("Cached transcript before AI failure")
+        raise RuntimeError("AI analysis failed after transcript")
+
+    service.video_service.process_video_complete = AsyncMock(side_effect=fail_after_transcript)
+
+    with pytest.raises(RuntimeError, match="AI analysis failed"):
+        await service.process_task(
+            task_id="task-1",
+            url="https://www.youtube.com/watch?v=demo",
+            source_type="youtube",
+        )
+
+    transcript_cache_calls = [
+        call
+        for call in service.cache_repo.upsert_cache.await_args_list
+        if call.kwargs.get("transcript_text") == "Cached transcript before AI failure"
+    ]
+    assert transcript_cache_calls
+    assert transcript_cache_calls[0].kwargs["analysis_json"] is None

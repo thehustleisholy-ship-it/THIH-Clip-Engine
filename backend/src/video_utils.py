@@ -94,6 +94,44 @@ class VideoProcessor:
         return settings.get(target_quality, settings["high"])
 
 
+
+DEFAULT_ASSEMBLYAI_SPEECH_MODELS = ["universal-3-pro", "universal-2"]
+LEGACY_ASSEMBLYAI_SPEECH_MODELS = {"best", "nano", "default", "none"}
+
+
+def resolve_assemblyai_speech_models(
+    value: str | List[str] | None,
+) -> List[str]:
+    """Normalize AssemblyAI speech model settings for the current SDK/API."""
+    if isinstance(value, list):
+        models = [str(item).strip() for item in value if str(item).strip()]
+    elif isinstance(value, str):
+        models = [item.strip() for item in value.split(",") if item.strip()]
+    else:
+        models = []
+
+    if not models:
+        return list(DEFAULT_ASSEMBLYAI_SPEECH_MODELS)
+
+    normalized = [model.lower() for model in models]
+    if any(model in LEGACY_ASSEMBLYAI_SPEECH_MODELS for model in normalized):
+        return list(DEFAULT_ASSEMBLYAI_SPEECH_MODELS)
+
+    return models
+
+
+def build_assemblyai_transcription_config(
+    speech_models: str | List[str] | None = None,
+):
+    """Build transcription config while preserving subtitle/diarization features."""
+    return aai.TranscriptionConfig(
+        speaker_labels=True,
+        punctuate=True,
+        format_text=True,
+        speech_models=resolve_assemblyai_speech_models(speech_models),
+    )
+
+
 def _prepare_audio_for_transcription(video_path: Path) -> Path:
     """Extract a compact audio-only file before uploading to AssemblyAI."""
     audio_path = video_path.with_name(f"{video_path.stem}.assemblyai.mp3")
@@ -187,16 +225,8 @@ def get_video_transcript(video_path: Path, speech_model: str = "best") -> str:
     aai.settings.http_timeout = runtime_config.assembly_ai_http_timeout_seconds
     transcriber = aai.Transcriber()
 
-    # Request word-level timestamps for precise subtitle sync
-    speech_model_value = aai.SpeechModel.best
-    if speech_model == "nano":
-        speech_model_value = aai.SpeechModel.nano
-
-    config_obj = aai.TranscriptionConfig(
-        speaker_labels=True,
-        punctuate=True,
-        format_text=True,
-        speech_model=speech_model_value,
+    config_obj = build_assemblyai_transcription_config(
+        runtime_config.assemblyai_speech_models or speech_model
     )
 
     try:
@@ -2637,6 +2667,3 @@ def apply_broll_to_clip(
     except Exception as e:
         logger.error(f"Error applying B-roll to clip: {e}")
         return False
-
-
-

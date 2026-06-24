@@ -196,6 +196,27 @@ def _get_local_video_dimensions(path: Path) -> tuple[int, int]:
         return (0, 0)
 
 
+def _find_cached_youtube_download(temp_dir: Path, video_id: str) -> Optional[Path]:
+    cached_files = [
+        file_path
+        for file_path in temp_dir.glob(f"{video_id}.*")
+        if file_path.is_file()
+        and file_path.stat().st_size > 0
+        and file_path.suffix.lower() in [".mp4", ".mkv", ".webm", ".mov", ".m4v"]
+    ]
+    if not cached_files:
+        return None
+
+    ranked_files = []
+    for candidate in cached_files:
+        width, height = _get_local_video_dimensions(candidate)
+        ranked_files.append((height, width, candidate.stat().st_size, candidate))
+    ranked_files.sort(reverse=True)
+    cached_path = ranked_files[0][3]
+    logger.info("Reusing cached YouTube download: %s", cached_path)
+    return cached_path
+
+
 def _remove_cached_downloads(temp_dir: Path, video_id: str) -> None:
     cached_files = [
         file_path
@@ -580,7 +601,9 @@ def download_youtube_video(
         return None
 
     downloader = YouTubeDownloader()
-    _remove_cached_downloads(downloader.temp_dir, video_id)
+    cached_download = _find_cached_youtube_download(downloader.temp_dir, video_id)
+    if cached_download:
+        return cached_download
 
     config = get_config()
     primary_provider = config.youtube_download_provider

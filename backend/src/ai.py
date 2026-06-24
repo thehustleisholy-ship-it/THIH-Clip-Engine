@@ -434,13 +434,85 @@ SCORING AND OUTPUT RULES:
 - virality_reasoning and reasoning should cite what is actually present in the chosen span
 - summary and key_topics must also stay grounded in the transcript and should not add outside interpretation
 
-Find 2-5 compelling segments that would work well as standalone clips. Quality over quantity: choose fewer stronger segments over filling a quota. Every selected segment must be accurate, self-contained, have proper time ranges, score high on THIH metrics, and use virality as a secondary signal."""
+Find 2-5 compelling, distinct clips from different parts of the sermon/video that would work well as standalone clips. Quality over quantity: choose fewer stronger segments over filling a quota, and never repeat the same opening window or overlapping moment. Every selected segment must be accurate, self-contained, have proper time ranges, score high on THIH metrics, and use virality as a secondary signal."""
 
 # Lazy-loaded agent to avoid import-time failures when API keys aren't set
-_transcript_agent: Optional[Agent[None, TranscriptAnalysis]] = None
-_transcript_agent_signature: Optional[tuple[str | None, ...]] = None
+_transcript_agent_cache: dict[tuple[str | None, ...], Agent[None, TranscriptAnalysis]] = {}
 
 SUPPORTED_LLM_PROVIDERS = {"google", "google-gla", "openai", "anthropic", "ollama"}
+SECRET_REDACTION_RE = re.compile(
+    r"(?i)(sk-[a-z0-9_-]+|api[_-]?key\s*[:=]\s*[^\s,;]+|token\s*[:=]\s*[^\s,;]+|bearer\s+[^\s,;]+)"
+)
+REQUEST_DETAIL_RE = re.compile(r"(?i)\b(request body|payload|messages|prompt)\b.*")
+STATUS_CODE_RE = re.compile(r"\b([45]\d{2})\b")
+RETRYABLE_ERROR_TERMS = (
+    "overload",
+    "rate limit",
+    "timeout",
+    "temporarily unavailable",
+    "unavailable",
+    "try again",
+    "429",
+    "500",
+    "502",
+    "503",
+    "504",
+)
+
+
+class AIAnalysisFailure(RuntimeError):
+    """Sanitized AI analysis failure safe to persist on tasks."""
+
+
+def _sanitize_provider_error(error: Exception) -> str:
+    message = str(error) or error.__class__.__name__
+    message = SECRET_REDACTION_RE.sub("[redacted]", message)
+    message = REQUEST_DETAIL_RE.sub("request details redacted", message)
+    message = " ".join(message.split())
+    return message[:220] or "provider error"
+
+
+def _extract_provider_status_code(error: Exception) -> int | None:
+    status_code = getattr(error, "status_code", None)
+    if status_code is None and getattr(error, "response", None) is not None:
+        status_code = getattr(error.response, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
+    match = STATUS_CODE_RE.search(str(error))
+    return int(match.group(1)) if match else None
+
+
+def _is_retryable_provider_error(error: Exception) -> bool:
+    status_code = _extract_provider_status_code(error)
+    if status_code in {408, 409, 425, 429, 500, 502, 503, 504}:
+        return True
+    sanitized = _sanitize_provider_error(error).lower()
+    return any(term in sanitized for term in RETRYABLE_ERROR_TERMS)
+
+
+def _format_provider_reason(llm_name: str, error: Exception) -> str:
+    status_code = _extract_provider_status_code(error)
+    reason = _sanitize_provider_error(error)
+    if status_code is not None:
+        return f"{llm_name} returned status {status_code}: {reason}"
+    return f"{llm_name} failed: {reason}"
+
+
+def _build_ai_analysis_failure_message(
+    attempted_models: list[str],
+    failures: list[tuple[str, Exception]],
+) -> str:
+    primary = attempted_models[0] if attempted_models else "not configured"
+    fallback_attempts = attempted_models[1:]
+    final_model, final_error = failures[-1] if failures else (primary, RuntimeError("unknown provider failure"))
+    fallback_text = ", ".join(fallback_attempts) if fallback_attempts else "none configured or usable"
+    return (
+        "AI analysis failed. "
+        f"Primary LLM: {primary}. "
+        f"Fallbacks attempted: {fallback_text}. "
+        f"Final provider reason: {_format_provider_reason(final_model, final_error)}. "
+        "Next action: check LLM provider availability, quotas, API keys, and LLM_FALLBACKS; then resume the task."
+    )
 
 def _normalize_content_mode(content_mode: ContentMode | str | None) -> ContentMode:
     if not content_mode:
@@ -501,10 +573,11 @@ def _get_missing_llm_key_error(model_name: str, runtime_config: Config) -> Optio
     return None
 
 
-def _build_transcript_model(runtime_config: Config) -> Model | str:
-    provider, provider_model_name = _split_llm_name(runtime_config.llm)
+def _build_transcript_model(runtime_config: Config, llm_name: str | None = None) -> Model | str:
+    selected_llm = llm_name or runtime_config.llm
+    provider, provider_model_name = _split_llm_name(selected_llm)
     if provider != "ollama":
-        return runtime_config.llm
+        return selected_llm
 
     if not provider_model_name:
         raise RuntimeError(
@@ -521,36 +594,93 @@ def _build_transcript_model(runtime_config: Config) -> Model | str:
     )
 
 
-def get_transcript_agent() -> Agent[None, TranscriptAnalysis]:
-    """Get or create the transcript analysis agent (lazy initialization)."""
-    global _transcript_agent, _transcript_agent_signature
-    runtime_config = get_config()
-    provider, _ = _split_llm_name(runtime_config.llm)
-    signature = (
-        runtime_config.llm,
+def _get_llm_candidate_names(runtime_config: Config) -> list[str]:
+    """Return primary LLM followed by configured fallback LLMs, de-duplicated."""
+    candidates = [runtime_config.llm]
+    candidates.extend(getattr(runtime_config, "llm_fallbacks", []) or [])
+
+    unique_candidates: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = str(candidate or "").strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        unique_candidates.append(normalized)
+    return unique_candidates
+
+
+def _transcript_agent_signature(
+    runtime_config: Config,
+    llm_name: str,
+) -> tuple[str | None, ...]:
+    return (
+        llm_name,
         runtime_config.openai_api_key,
         runtime_config.google_api_key,
         runtime_config.anthropic_api_key,
         runtime_config.ollama_base_url,
         runtime_config.ollama_api_key,
     )
-    if _transcript_agent is None or _transcript_agent_signature != signature:
-        apply_settings_to_process_env(runtime_config.as_runtime_settings())
-        config_error = _get_missing_llm_key_error(runtime_config.llm, runtime_config)
-        if config_error:
-            raise RuntimeError(config_error)
 
-        _transcript_agent = Agent[None, TranscriptAnalysis](
-            model=_build_transcript_model(runtime_config),
-            output_type=TranscriptAnalysis,
-            system_prompt=transcript_analysis_system_prompt,
-            # Some local Ollama/OpenAI-compatible endpoints can return formatted
-            # prose before settling on schema-valid JSON. Keep retries limited
-            # while still allowing enough repair attempts for local models.
-            output_retries=2 if provider == "ollama" else 2,
+
+def _get_or_create_transcript_agent(
+    runtime_config: Config,
+    llm_name: str,
+) -> Agent[None, TranscriptAnalysis]:
+    provider, _ = _split_llm_name(llm_name)
+    signature = _transcript_agent_signature(runtime_config, llm_name)
+    cached_agent = _transcript_agent_cache.get(signature)
+    if cached_agent is not None:
+        return cached_agent
+
+    config_error = _get_missing_llm_key_error(llm_name, runtime_config)
+    if config_error:
+        raise RuntimeError(config_error)
+
+    agent = Agent[None, TranscriptAnalysis](
+        model=_build_transcript_model(runtime_config, llm_name),
+        output_type=TranscriptAnalysis,
+        system_prompt=transcript_analysis_system_prompt,
+        output_retries=2 if provider == "ollama" else 2,
+    )
+    _transcript_agent_cache[signature] = agent
+    return agent
+
+
+def get_transcript_agent_candidates() -> list[tuple[str, Agent[None, TranscriptAnalysis]]]:
+    """Build usable transcript-analysis agents in primary/fallback order."""
+    runtime_config = get_config()
+    apply_settings_to_process_env(runtime_config.as_runtime_settings())
+
+    agents: list[tuple[str, Agent[None, TranscriptAnalysis]]] = []
+    config_errors: list[str] = []
+    for attempt_number, llm_name in enumerate(_get_llm_candidate_names(runtime_config), start=1):
+        config_error = _get_missing_llm_key_error(llm_name, runtime_config)
+        if config_error:
+            config_errors.append(config_error)
+            logger.warning(
+                "LLM candidate skipped: model=%s attempt=%s reason=%s",
+                llm_name,
+                attempt_number,
+                config_error,
+            )
+            continue
+        agents.append((llm_name, _get_or_create_transcript_agent(runtime_config, llm_name)))
+
+    if not agents:
+        raise RuntimeError(
+            config_errors[0]
+            if config_errors
+            else "No usable LLM candidates are configured."
         )
-        _transcript_agent_signature = signature
-    return _transcript_agent
+
+    return agents
+
+
+def get_transcript_agent() -> Agent[None, TranscriptAnalysis]:
+    """Get the primary transcript analysis agent for backward-compatible callers."""
+    return get_transcript_agent_candidates()[0][1]
 
 
 def build_transcript_analysis_prompt(
@@ -558,6 +688,7 @@ def build_transcript_analysis_prompt(
     include_broll: bool = False,
     clip_signals: str | None = None,
     content_mode: ContentMode | str = DEFAULT_CONTENT_MODE,
+    selection_instructions: str | None = None,
 ) -> str:
     """Build the grounded task prompt for transcript analysis."""
     normalized_content_mode = _normalize_content_mode(content_mode)
@@ -574,6 +705,14 @@ def build_transcript_analysis_prompt(
             f"{clip_signals}\n\n"
             "Use these as hints only. They should influence ranking, but every final segment "
             "must still be a coherent contiguous transcript range."
+        )
+    instructions_section = ""
+    if selection_instructions and selection_instructions.strip():
+        instructions_section = (
+            "\n\nTask-level THIH Shorts Factory selection instructions:\n"
+            f"{selection_instructions.strip()}\n\n"
+            "Use these instructions only when they are consistent with the transcript, "
+            "message integrity, and the required JSON schema."
         )
 
     return f"""Analyze this video transcript and identify the most engaging segments for short-form content.
@@ -593,6 +732,7 @@ Follow this workflow:
 
 Selection target:
 - Choose 2-5 segments total.
+- Choose distinct clips from different parts of the sermon/video; do not repeat the same opening window, overlapping range, or substantially identical transcript moment.
 - Most selected clips should be 25-50 seconds.
 - Only choose a 15-24 second clip when it already contains a full setup and payoff.
 - If a strong moment is shorter than 25 seconds, first try expanding to nearby contiguous transcript lines that add useful context.
@@ -608,6 +748,7 @@ Critical accuracy requirements:
 - If there is a tradeoff between "viral" and "accurate", choose accuracy.
 - Do not reject or penalize a segment simply because of the subject matter; stay content-neutral and assess clip quality only.
 {signal_section}
+{instructions_section}
 
 JSON-only output requirements:
 - Return one valid JSON object and nothing else.
@@ -777,6 +918,7 @@ async def get_most_relevant_parts_by_transcript(
     include_broll: bool = False,
     clip_signals: str | None = None,
     content_mode: ContentMode | str = DEFAULT_CONTENT_MODE,
+    selection_instructions: str | None = None,
 ) -> TranscriptAnalysis:
     """Get the most relevant parts of a transcript with virality scoring and optional B-roll detection."""
     logger.info(
@@ -784,18 +926,46 @@ async def get_most_relevant_parts_by_transcript(
     )
 
     try:
-        agent = get_transcript_agent()
-
-        result = await agent.run(
-            build_transcript_analysis_prompt(
-                transcript=transcript,
-                include_broll=include_broll,
-                clip_signals=clip_signals,
-                content_mode=content_mode,
-            )
+        prompt = build_transcript_analysis_prompt(
+            transcript=transcript,
+            include_broll=include_broll,
+            clip_signals=clip_signals,
+            content_mode=content_mode,
+            selection_instructions=selection_instructions,
         )
-
-        analysis = result.output
+        failures: list[tuple[str, Exception]] = []
+        candidates = get_transcript_agent_candidates()
+        attempted_models = [llm_name for llm_name, _ in candidates]
+        for attempt_number, (llm_name, agent) in enumerate(candidates, start=1):
+            logger.info(
+                "LLM candidate attempt %s/%s: model=%s",
+                attempt_number,
+                len(candidates),
+                llm_name,
+            )
+            try:
+                result = await agent.run(prompt)
+                analysis = result.output
+                if attempt_number > 1:
+                    logger.info(
+                        "LLM fallback selected: model=%s attempt=%s",
+                        llm_name,
+                        attempt_number,
+                    )
+                break
+            except Exception as candidate_error:
+                failures.append((llm_name, candidate_error))
+                logger.warning(
+                    "LLM candidate failed: model=%s attempt=%s retryable=%s reason=%s",
+                    llm_name,
+                    attempt_number,
+                    _is_retryable_provider_error(candidate_error),
+                    _format_provider_reason(llm_name, candidate_error),
+                )
+        else:
+            raise AIAnalysisFailure(
+                _build_ai_analysis_failure_message(attempted_models, failures)
+            )
         logger.info(
             f"AI analysis found {len(analysis.most_relevant_segments)} segments"
         )
@@ -921,6 +1091,10 @@ async def get_most_relevant_parts_by_transcript(
 def get_most_relevant_parts_sync(transcript: str) -> TranscriptAnalysis:
     """Synchronous wrapper for the async function."""
     return asyncio.run(get_most_relevant_parts_by_transcript(transcript))
+
+
+
+
 
 
 

@@ -62,6 +62,13 @@ def _normalize_content_mode(value: Any) -> str:
     if normalized in SUPPORTED_CONTENT_MODES:
         return normalized
     return DEFAULT_CONTENT_MODE
+
+def _normalize_selection_instructions(value: Any) -> str:
+    if value is None:
+        return ""
+    normalized = str(value).strip()
+    return normalized[:4000]
+
 def _get_user_id_from_headers(request: Request) -> str:
     """Get the authenticated user ID from trusted frontend headers."""
     config = get_config()
@@ -122,6 +129,7 @@ def _merge_task_source_metadata(
     add_subtitles: Any = None,
     cleanup_settings: Dict[str, Any] | None = None,
     content_mode: Any = None,
+    selection_instructions: Any = None,
 ) -> Dict[str, Any]:
     merged = dict(existing or {})
 
@@ -137,6 +145,8 @@ def _merge_task_source_metadata(
         merged.update(cleanup_settings)
     if content_mode is not None:
         merged["content_mode"] = _normalize_content_mode(content_mode)
+    if selection_instructions is not None:
+        merged["selection_instructions"] = _normalize_selection_instructions(selection_instructions)
 
     return merged
 
@@ -210,6 +220,7 @@ async def create_task(request: Request, db: AsyncSession = Depends(get_db)):
     if not isinstance(add_subtitles, bool):
         add_subtitles = True
     content_mode = _normalize_content_mode(data.get("content_mode"))
+    selection_instructions = _normalize_selection_instructions(data.get("selection_instructions"))
     cleanup_settings = normalize_clip_cleanup_settings(
         data.get("cut_long_pauses"),
         data.get("pause_threshold_ms"),
@@ -261,6 +272,7 @@ async def create_task(request: Request, db: AsyncSession = Depends(get_db)):
             add_subtitles,
             cleanup_settings,
             content_mode,
+            selection_instructions,
         )
 
         # Save source metadata for resume/retries in environments without sources.url column
@@ -274,6 +286,7 @@ async def create_task(request: Request, db: AsyncSession = Depends(get_db)):
                 add_subtitles=add_subtitles,
                 cleanup_settings=cleanup_settings,
                 content_mode=content_mode,
+                selection_instructions=selection_instructions,
             ),
         )
 
@@ -742,6 +755,11 @@ async def apply_task_settings(
         )
         metadata = await _load_task_source_metadata(task_id)
         content_mode = _normalize_content_mode(payload.get("content_mode") or metadata.get("content_mode"))
+        selection_instructions = _normalize_selection_instructions(
+            payload.get("selection_instructions")
+            if "selection_instructions" in payload
+            else metadata.get("selection_instructions")
+        )
         await _save_task_source_metadata(
             task_id,
             _merge_task_source_metadata(
@@ -756,6 +774,7 @@ async def apply_task_settings(
                 ),
                 cleanup_settings=cleanup_settings,
                 content_mode=content_mode,
+                selection_instructions=selection_instructions,
             ),
         )
         return {"task": task, "message": "Task settings updated"}
@@ -934,6 +953,7 @@ async def resume_task(
             task.get("processing_mode") or runtime_config.default_processing_mode
         )
         content_mode = _normalize_content_mode(metadata.get("content_mode"))
+        selection_instructions = _normalize_selection_instructions(metadata.get("selection_instructions"))
 
         job_id = await JobQueue.enqueue_processing_job(
             "process_video_task",
@@ -951,6 +971,7 @@ async def resume_task(
             add_subtitles,
             cleanup_settings,
             content_mode,
+            selection_instructions,
         )
 
         return {"message": "Task resumed", "job_id": job_id}

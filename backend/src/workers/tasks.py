@@ -28,6 +28,7 @@ async def process_video_task(
     add_subtitles: bool = True,
     cleanup_settings: Dict[str, Any] | None = None,
     content_mode: str = "thih_systems",
+    selection_instructions: str | None = None,
 ) -> Dict[str, Any]:
     """
     Background worker task to process a video.
@@ -92,8 +93,9 @@ async def process_video_task(
                 progress_callback=update_progress,
                 should_cancel=should_cancel,
                 clip_ready_callback=clip_ready_callback,
-                cleanup_settings=cleanup_settings,
+cleanup_settings=cleanup_settings,
                 content_mode=content_mode,
+                selection_instructions=selection_instructions,
             )
 
             logger.info(f"Task {task_id} completed successfully")
@@ -145,4 +147,5 @@ class WorkerSettings:
     # Worker pool settings
     max_jobs = 4  # Process up to 4 jobs simultaneously
     cron_jobs = []
+
 

@@ -1,6 +1,9 @@
+import pytest
 from types import SimpleNamespace
 
 from pydantic_ai.models.ollama import OllamaModel
+
+from src import ai
 
 from src.ai import (
     IDEAL_CLIP_MAX_SECONDS,
@@ -54,6 +57,7 @@ def test_build_transcript_analysis_prompt_requires_transcript_fidelity():
     assert "Do not reject or penalize a segment simply because of the subject matter" in prompt
     assert f"Most selected clips should be {IDEAL_CLIP_MIN_SECONDS}-{IDEAL_CLIP_MAX_SECONDS} seconds." in prompt
     assert "viewer would understand and care without seeing the rest" in prompt
+    assert "distinct clips from different parts" in prompt
     assert "Return one valid JSON object and nothing else." in prompt
     assert "No Markdown, headings, bullets, code fences" in prompt
     assert "[00:12 - 00:21] A strong opening line" in prompt
@@ -159,3 +163,88 @@ def test_build_transcript_analysis_prompt_accepts_content_modes():
         assert mode in prompt
     assert "THIH scoring" in prompt
     assert "recommended_hashtags" in prompt
+@pytest.mark.asyncio
+async def test_transcript_analysis_uses_fallback_agent_when_primary_fails(monkeypatch):
+    calls = []
+
+    class FakeAgent:
+        def __init__(self, name, should_fail=False):
+            self.name = name
+            self.should_fail = should_fail
+
+        async def run(self, prompt):
+            calls.append(self.name)
+            if self.should_fail:
+                raise RuntimeError("provider overloaded")
+            return SimpleNamespace(
+                output=ai.TranscriptAnalysis(
+                    most_relevant_segments=[
+                        ai.TranscriptSegment(
+                            start_time="00:00",
+                            end_time="00:30",
+                            text="A complete standalone moment with useful context for the viewer.",
+                            relevance_score=0.91,
+                        )
+                    ],
+                    summary="Fallback succeeded",
+                    key_topics=["fallback"],
+                )
+            )
+
+    monkeypatch.setattr(
+        ai,
+        "get_transcript_agent_candidates",
+        lambda: [
+            ("google-gla:primary", FakeAgent("primary", should_fail=True)),
+            ("openai:fallback", FakeAgent("fallback")),
+        ],
+    )
+
+    result = await ai.get_most_relevant_parts_by_transcript(
+        "[00:00 - 00:30] A complete standalone moment with useful context for the viewer."
+    )
+
+    assert calls == ["primary", "fallback"]
+    assert result.summary == "Fallback succeeded"
+    assert len(result.most_relevant_segments) == 1
+@pytest.mark.asyncio
+async def test_transcript_analysis_failure_message_is_sanitized_and_actionable(monkeypatch):
+    class FailingAgent:
+        async def run(self, prompt):
+            error = RuntimeError("503 overloaded while using sk-secret-token with request body payload")
+            error.status_code = 503
+            raise error
+
+    monkeypatch.setattr(
+        ai,
+        "get_transcript_agent_candidates",
+        lambda: [
+            ("google-gla:primary", FailingAgent()),
+            ("openai:fallback", FailingAgent()),
+        ],
+    )
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await ai.get_most_relevant_parts_by_transcript(
+            "[00:00 - 00:30] A complete standalone moment with useful context for the viewer."
+        )
+
+    message = str(exc_info.value)
+    assert "Primary LLM: google-gla:primary" in message
+    assert "Fallbacks attempted: openai:fallback" in message
+    assert "Final provider reason: openai:fallback returned status 503" in message
+    assert "Next action:" in message
+    assert "sk-secret-token" not in message
+    assert "request body payload" not in message
+
+
+def test_build_transcript_analysis_prompt_includes_shorts_factory_instructions():
+    prompt = build_transcript_analysis_prompt(
+        transcript="[00:08 - 00:37] Steward the work with clarity and conviction.",
+        content_mode="sermon",
+        selection_instructions="Prioritize Romans 12:2 moments with practical application.",
+    )
+
+    assert "Task-level THIH Shorts Factory selection instructions" in prompt
+    assert "Prioritize Romans 12:2 moments with practical application." in prompt
+    assert "message integrity" in prompt

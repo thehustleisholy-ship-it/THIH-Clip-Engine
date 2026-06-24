@@ -4,7 +4,9 @@ Video service - handles video processing business logic.
 
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Callable, Awaitable
+from difflib import SequenceMatcher
 import logging
+import re
 import json
 import subprocess
 import uuid
@@ -114,6 +116,85 @@ def build_segment_json(segment: Any) -> Dict[str, Any]:
     return payload
 
 
+CLIP_DUPLICATE_START_THRESHOLD_SECONDS = 5
+CLIP_DUPLICATE_OVERLAP_RATIO = 0.5
+CLIP_DUPLICATE_TEXT_RATIO = 0.86
+_TEXT_TOKEN_RE = re.compile(r"[a-z0-9]+")
+
+
+def _segment_seconds(segment: Dict[str, Any]) -> tuple[int, int] | None:
+    try:
+        start = parse_timestamp_to_seconds(str(segment.get("start_time") or ""))
+        end = parse_timestamp_to_seconds(str(segment.get("end_time") or ""))
+    except Exception:
+        return None
+    if end <= start:
+        return None
+    return start, end
+
+
+def _clip_overlap_ratio(a: tuple[int, int], b: tuple[int, int]) -> float:
+    overlap = max(0, min(a[1], b[1]) - max(a[0], b[0]))
+    if overlap <= 0:
+        return 0.0
+    shorter_duration = max(1, min(a[1] - a[0], b[1] - b[0]))
+    return overlap / shorter_duration
+
+
+def _normalized_text_tokens(text: str) -> list[str]:
+    return _TEXT_TOKEN_RE.findall((text or "").lower())
+
+
+def _text_substantially_identical(left: str, right: str) -> bool:
+    left_tokens = _normalized_text_tokens(left)
+    right_tokens = _normalized_text_tokens(right)
+    if not left_tokens or not right_tokens:
+        return False
+    left_set = set(left_tokens)
+    right_set = set(right_tokens)
+    jaccard = len(left_set & right_set) / max(1, len(left_set | right_set))
+    sequence_ratio = SequenceMatcher(None, " ".join(left_tokens), " ".join(right_tokens)).ratio()
+    return jaccard >= 0.8 or sequence_ratio >= CLIP_DUPLICATE_TEXT_RATIO
+
+
+def _segment_quality_score(segment: Dict[str, Any]) -> tuple[float, float, float]:
+    return (
+        float(segment.get("thih_score") or 0),
+        float(segment.get("virality_score") or 0),
+        float(segment.get("relevance_score") or 0),
+    )
+
+
+def _segments_are_duplicate(candidate: Dict[str, Any], accepted: Dict[str, Any]) -> bool:
+    candidate_range = _segment_seconds(candidate)
+    accepted_range = _segment_seconds(accepted)
+    if candidate_range and accepted_range:
+        if abs(candidate_range[0] - accepted_range[0]) <= CLIP_DUPLICATE_START_THRESHOLD_SECONDS:
+            return True
+        allow_overlap = bool(candidate.get("allow_overlap") or accepted.get("allow_overlap"))
+        if not allow_overlap and _clip_overlap_ratio(candidate_range, accepted_range) > CLIP_DUPLICATE_OVERLAP_RATIO:
+            return True
+    return _text_substantially_identical(
+        str(candidate.get("text") or ""),
+        str(accepted.get("text") or ""),
+    )
+
+
+def deduplicate_clip_segments(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove duplicate or overlapping clip candidates before render/persistence."""
+    sorted_segments = sorted(
+        enumerate(segments),
+        key=lambda item: (_segment_quality_score(item[1]), -item[0]),
+        reverse=True,
+    )
+    accepted: List[tuple[int, Dict[str, Any]]] = []
+    for original_index, candidate in sorted_segments:
+        if any(_segments_are_duplicate(candidate, existing) for _, existing in accepted):
+            continue
+        accepted.append((original_index, candidate))
+
+    return [segment for _, segment in sorted(accepted, key=lambda item: item[0])]
+
 class VideoService:
     """Service for video processing operations."""
 
@@ -192,7 +273,8 @@ class VideoService:
     async def analyze_transcript(
         transcript: str,
         clip_signals: Optional[str] = None,
-        content_mode: str = "thih_systems",
+content_mode: str = "thih_systems",
+        selection_instructions: Optional[str] = None,
     ) -> Any:
         """
         Analyze transcript with AI to find relevant segments.
@@ -202,7 +284,8 @@ class VideoService:
         relevant_parts = await get_most_relevant_parts_by_transcript(
             transcript,
             clip_signals=clip_signals,
-            content_mode=content_mode,
+content_mode=content_mode,
+            selection_instructions=selection_instructions,
         )
         logger.info(
             f"AI analysis complete: {len(relevant_parts.most_relevant_segments)} segments found"
@@ -403,9 +486,11 @@ class VideoService:
         add_subtitles: bool = True,
         cached_transcript: Optional[str] = None,
         cached_analysis_json: Optional[str] = None,
+        cache_transcript_callback: Optional[Callable[[str], Awaitable[None]]] = None,
         progress_callback: Optional[Callable[[int, str, str], Awaitable[None]]] = None,
         should_cancel: Optional[Callable[[], Awaitable[bool]]] = None,
-        content_mode: str = "thih_systems",
+content_mode: str = "thih_systems",
+        selection_instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Complete video processing pipeline.
@@ -463,6 +548,8 @@ class VideoService:
                 transcript = await VideoService.generate_transcript(
                     video_path, processing_mode=processing_mode
                 )
+            if cache_transcript_callback and transcript:
+                await cache_transcript_callback(transcript)
 
             # Step 3: AI analysis
             if should_cancel and await should_cancel():
@@ -515,7 +602,8 @@ class VideoService:
                 relevant_parts = await VideoService.analyze_transcript(
                     transcript,
                     clip_signals=clip_signals,
-                    content_mode=content_mode,
+content_mode=content_mode,
+                    selection_instructions=selection_instructions,
                 )
 
             # Step 4: Create clips
@@ -526,44 +614,19 @@ class VideoService:
                 await progress_callback(70, "Creating video clips...", "processing")
 
             raw_segments = relevant_parts.most_relevant_segments
-            segments_json: List[Dict[str, Any]] = []
-            for segment in raw_segments:
-                if isinstance(segment, dict):
-                    virality = segment.get("virality") or {}
-                    if hasattr(virality, "model_dump"):
-                        virality = virality.model_dump()
-                    segments_json.append(
-                        {
-                            "start_time": segment.get("start_time"),
-                            "end_time": segment.get("end_time"),
-                            "text": segment.get("text", ""),
-                            "relevance_score": segment.get("relevance_score", 0.0),
-                            "reasoning": segment.get("reasoning", ""),
-                            "virality_score": virality.get("total_score", 0),
-                            "hook_score": virality.get("hook_score", 0),
-                            "engagement_score": virality.get("engagement_score", 0),
-                            "value_score": virality.get("value_score", 0),
-                            "shareability_score": virality.get("shareability_score", 0),
-                            "hook_type": virality.get("hook_type"),
-                        }
-                    )
-                else:
-                    virality = segment.virality.model_dump() if segment.virality else {}
-                    segments_json.append(
-                        {
-                            "start_time": segment.start_time,
-                            "end_time": segment.end_time,
-                            "text": segment.text,
-                            "relevance_score": segment.relevance_score,
-                            "reasoning": segment.reasoning,
-                            "virality_score": virality.get("total_score", 0),
-                            "hook_score": virality.get("hook_score", 0),
-                            "engagement_score": virality.get("engagement_score", 0),
-                            "value_score": virality.get("value_score", 0),
-                            "shareability_score": virality.get("shareability_score", 0),
-                            "hook_type": virality.get("hook_type"),
-                        }
-                    )
+            segments_json: List[Dict[str, Any]] = [
+                build_segment_json(segment) for segment in raw_segments
+            ]
+            raw_segment_count = len(segments_json)
+            unique_segments = deduplicate_clip_segments(segments_json)
+            removed_duplicate_count = raw_segment_count - len(unique_segments)
+            logger.info(
+                "Clip candidate dedupe: raw=%s removed_duplicates=%s final_unique=%s",
+                raw_segment_count,
+                removed_duplicate_count,
+                len(unique_segments),
+            )
+            segments_json = unique_segments
 
             if processing_mode == "fast":
                 segments_json = segments_json[: runtime_config.fast_mode_max_clips]
@@ -590,6 +653,8 @@ class VideoService:
         except Exception as e:
             logger.error(f"Error in video processing pipeline: {e}")
             raise
+
+
 
 
 

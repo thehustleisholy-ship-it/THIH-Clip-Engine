@@ -102,9 +102,15 @@ class VideoUtilsDiarizationTests(unittest.TestCase):
 
     @patch("src.video_utils.aai.Transcriber")
     @patch("src.video_utils.aai.TranscriptionConfig")
+    @patch("src.video_utils.get_config")
     def test_get_video_transcript_enables_speaker_labels(
-        self, mock_transcription_config, mock_transcriber
+        self, mock_get_config, mock_transcription_config, mock_transcriber
     ):
+        mock_get_config.return_value = SimpleNamespace(
+            assembly_ai_api_key="test-key",
+            assembly_ai_http_timeout_seconds=900,
+            assemblyai_speech_models=None,
+        )
         transcript = SimpleNamespace(
             status=video_utils.aai.TranscriptStatus.completed,
             error=None,
@@ -139,7 +145,12 @@ class VideoUtilsDiarizationTests(unittest.TestCase):
 
         self.assertIn("Speaker A: Hello there.", result)
         mock_transcription_config.assert_called_once()
-        self.assertTrue(mock_transcription_config.call_args.kwargs["speaker_labels"])
+        config_kwargs = mock_transcription_config.call_args.kwargs
+        self.assertTrue(config_kwargs["speaker_labels"])
+        self.assertTrue(config_kwargs["punctuate"])
+        self.assertTrue(config_kwargs["format_text"])
+        self.assertEqual(config_kwargs["speech_models"], ["universal-3-pro", "universal-2"])
+        self.assertNotIn("speech_model", config_kwargs)
 
     def test_load_cached_transcript_data_supports_legacy_word_only_cache(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -161,6 +172,26 @@ class VideoUtilsDiarizationTests(unittest.TestCase):
 
         self.assertIsNotNone(payload)
         self.assertEqual(payload["words"][0]["text"], "legacy")
+
+    def test_resolve_assemblyai_speech_models_maps_legacy_values(self):
+        self.assertEqual(
+            video_utils.resolve_assemblyai_speech_models("best"),
+            ["universal-3-pro", "universal-2"],
+        )
+        self.assertEqual(
+            video_utils.resolve_assemblyai_speech_models("nano"),
+            ["universal-3-pro", "universal-2"],
+        )
+        self.assertEqual(
+            video_utils.resolve_assemblyai_speech_models("universal-2"),
+            ["universal-2"],
+        )
+        self.assertEqual(
+            video_utils.resolve_assemblyai_speech_models(
+                "universal-3-pro, universal-2"
+            ),
+            ["universal-3-pro", "universal-2"],
+        )
 
 
 if __name__ == "__main__":

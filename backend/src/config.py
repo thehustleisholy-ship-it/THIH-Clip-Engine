@@ -21,9 +21,17 @@ class Config:
 
         self.whisper_model = os.getenv("WHISPER_MODEL", "base")
         self.llm = self._get_runtime_setting("LLM") or self._infer_default_llm()
+        self.llm_fallbacks = self._get_csv_env(
+            "LLM_FALLBACKS", self._infer_llm_fallbacks(self.llm)
+        )
         self.assembly_ai_api_key = self._get_runtime_setting("ASSEMBLY_AI_API_KEY")
         self.assembly_ai_http_timeout_seconds = int(
             os.getenv("ASSEMBLY_AI_HTTP_TIMEOUT_SECONDS", "900")
+        )
+        self.assemblyai_speech_models = (
+            self._get_csv_env("ASSEMBLYAI_SPEECH_MODELS", [])
+            if self._get_optional_env("ASSEMBLYAI_SPEECH_MODELS")
+            else None
         )
         self.pexels_api_key = self._get_runtime_setting("PEXELS_API_KEY")
         self.apify_api_token = self._get_runtime_setting("APIFY_API_TOKEN")
@@ -110,6 +118,7 @@ class Config:
         return {
             "ASSEMBLY_AI_API_KEY": self.assembly_ai_api_key,
             "LLM": self.llm,
+            "LLM_FALLBACKS": ",".join(self.llm_fallbacks) if self.llm_fallbacks else None,
             "OPENAI_API_KEY": self.openai_api_key,
             "GOOGLE_API_KEY": self.google_api_key,
             "ANTHROPIC_API_KEY": self.anthropic_api_key,
@@ -172,6 +181,18 @@ class Config:
             return DOCKER_OLLAMA_BASE_URL
         return LOCAL_OLLAMA_BASE_URL
 
+    def _infer_llm_fallbacks(self, primary_llm: str) -> list[str]:
+        """Infer backup hosted LLMs from configured provider keys."""
+        primary_provider = primary_llm.split(":", 1)[0].strip().lower()
+        fallbacks: list[str] = []
+        if primary_provider not in {"google", "google-gla"} and self.google_api_key:
+            fallbacks.append("google-gla:gemini-3-flash-preview")
+        if primary_provider != "openai" and self.openai_api_key:
+            fallbacks.append("openai:gpt-5.2")
+        if primary_provider != "anthropic" and self.anthropic_api_key:
+            fallbacks.append("anthropic:claude-4-sonnet")
+        return fallbacks
+
     def _infer_default_llm(self) -> str:
         """
         Infer a usable default model based on whichever API key is present.
@@ -196,4 +217,3 @@ def get_config() -> Config:
 def set_config_override(config: Config | None) -> None:
     global _config_override
     _config_override = config
-

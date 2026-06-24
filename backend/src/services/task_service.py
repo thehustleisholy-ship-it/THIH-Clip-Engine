@@ -80,11 +80,18 @@ class TaskService:
         source_type: str,
         processing_mode: str,
         content_mode: str = DEFAULT_CONTENT_MODE,
+        selection_instructions: str | None = None,
     ) -> str:
         mode_part = "" if content_mode == DEFAULT_CONTENT_MODE else f"|{content_mode}"
+        instructions_part = ""
+        if selection_instructions and selection_instructions.strip():
+            instructions_hash = hashlib.sha256(
+                selection_instructions.strip().encode("utf-8")
+            ).hexdigest()[:12]
+            instructions_part = f"|instructions:{instructions_hash}"
         payload = (
             f"{source_type}|{processing_mode}|"
-            f"{TRANSCRIPT_ANALYSIS_CACHE_VERSION}{mode_part}|{url.strip()}"
+            f"{TRANSCRIPT_ANALYSIS_CACHE_VERSION}{mode_part}{instructions_part}|{url.strip()}"
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -176,6 +183,7 @@ class TaskService:
         clip_ready_callback: Optional[Callable] = None,
         cleanup_settings: Optional[Dict[str, Any]] = None,
         content_mode: str = DEFAULT_CONTENT_MODE,
+        selection_instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Process a task: download video, analyze, create clips.
@@ -185,7 +193,13 @@ class TaskService:
             logger.info(f"Starting processing for task {task_id}")
             started_at = datetime.utcnow()
             stage_timings: Dict[str, float] = {}
-            cache_key = self._build_cache_key(url, source_type, processing_mode, content_mode)
+            cache_key = self._build_cache_key(
+                url,
+                source_type,
+                processing_mode,
+                content_mode,
+                selection_instructions,
+            )
 
             cache_entry = await self.cache_repo.get_cache(self.db, cache_key)
             cached_transcript = (
@@ -226,6 +240,18 @@ class TaskService:
                 if progress_callback:
                     await progress_callback(progress, message, status)
 
+            async def cache_transcript_for_resume(transcript_text: str) -> None:
+                if not transcript_text:
+                    return
+                await self.cache_repo.upsert_cache(
+                    self.db,
+                    cache_key=cache_key,
+                    source_url=url,
+                    source_type=source_type,
+                    transcript_text=transcript_text,
+                    analysis_json=None,
+                )
+
             # Process video with progress updates
             pipeline_start = perf_counter()
             result = await self.video_service.process_video_complete(
@@ -241,9 +267,11 @@ class TaskService:
                 add_subtitles=add_subtitles,
                 cached_transcript=cached_transcript,
                 cached_analysis_json=cached_analysis_json,
+                cache_transcript_callback=cache_transcript_for_resume,
                 progress_callback=update_progress,
                 should_cancel=should_cancel,
-                content_mode=content_mode,
+content_mode=content_mode,
+                selection_instructions=selection_instructions,
             )
             stage_timings["pipeline_seconds"] = round(
                 perf_counter() - pipeline_start, 3
@@ -546,6 +574,7 @@ class TaskService:
         apply_to_existing: bool,
         cleanup_settings: Optional[Dict[str, Any]] = None,
         content_mode: str = DEFAULT_CONTENT_MODE,
+        selection_instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update task-level settings and optionally regenerate all clips."""
         await self.task_repo.update_task_settings(
@@ -972,5 +1001,7 @@ class TaskService:
                 parsed.get("filtered_words"),
             ),
         }
+
+
 
 
