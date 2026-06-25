@@ -189,6 +189,31 @@ class TranscriptSegment(BaseModel):
     content_warning: Optional[str] = Field(
         default=None, description="Content warning when directly applicable."
     )
+    hook_sentence: str = Field(default="", description="Exact first hook sentence used as the clip opening.")
+    key_point: str = Field(default="", description="Specific key point captured by the clip.")
+    start_reason: str = Field(default="", description="Why this start boundary was selected.")
+    end_reason: str = Field(default="", description="Why this end boundary completes the thought.")
+    moment_type: str = Field(default="", description="Editorial sermon moment type.")
+    why_selected: str = Field(default="", description="Evidence-grounded reason this candidate was selected.")
+    why_this_is_not_intro: str = Field(default="", description="Why this is not merely intro/setup content.")
+    why_this_is_complete_thought: str = Field(default="", description="Why the clip is self-contained.")
+    suggested_title: Optional[str] = Field(default=None, description="Model-proposed title alias.")
+    rejection_risks: List[str] = Field(default_factory=list, description="Potential editorial rejection risks.")
+    hook_score_breakdown: Dict[str, int] = Field(default_factory=dict)
+    ending_score_breakdown: Dict[str, int] = Field(default_factory=dict)
+    publishability_score: int = Field(default=0, ge=0, le=100)
+    publishability_verdict: str = Field(default="")
+    clip_intelligence: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("rejection_risks", mode="before")
+    @classmethod
+    def _coerce_rejection_risks(cls, value: Any) -> Any:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [part.strip() for part in value.split(",") if part.strip()]
+        return value
+
     @field_validator("recommended_hashtags", mode="before")
     @classmethod
     def _coerce_hashtags(cls, value: Any) -> Any:
@@ -218,7 +243,7 @@ class TranscriptSegment(BaseModel):
         fallback_text = self.text.strip()
         short_text = fallback_text[:77].rstrip() + "..." if len(fallback_text) > 80 else fallback_text
         if not self.recommended_title:
-            self.recommended_title = short_text or "THIH Clip Engine Moment"
+            self.recommended_title = self.suggested_title or short_text or "THIH Clip Engine Moment"
         if not self.recommended_caption:
             self.recommended_caption = short_text or "The hustle is holy when the work is stewarded well."
         if not self.recommended_cta:
@@ -286,6 +311,10 @@ class TranscriptAnalysis(BaseModel):
     broll_opportunities: Optional[List[BRollOpportunity]] = Field(
         default=None, description="Opportunities to insert B-roll footage"
     )
+    candidate_review: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Pre-render editorial audit of raw, accepted, rejected, and shifted candidates.",
+    )
 
 
 # Enhanced system prompt with virality scoring and B-roll detection
@@ -297,7 +326,7 @@ OUTPUT CONTRACT:
 - Return valid JSON only. Do not output Markdown, headings, bullets, prose, code fences, explanations, or commentary outside the JSON object.
 - The top-level JSON object must include: "most_relevant_segments", "summary", and "key_topics".
 - Only include "broll_opportunities" when B-roll was requested.
-- Each item in "most_relevant_segments" must include: "start_time", "end_time", "text", "relevance_score", "reasoning", "content_mode", "thih", "virality", "recommended_title", "recommended_caption", "recommended_cta", "recommended_hashtags", and "platform_fit".
+- Each item in "most_relevant_segments" must include: "start_time", "end_time", "text", "relevance_score", "reasoning", "content_mode", "thih", "virality", "hook_sentence", "key_point", "start_reason", "end_reason", "moment_type", "why_selected", "why_this_is_not_intro", "why_this_is_complete_thought", "suggested_title", "recommended_title", "recommended_caption", "recommended_cta", "recommended_hashtags", "platform_fit", and "rejection_risks".
 - Do not use "segment" as an output field. Use "text".
 - "thih" must include: "opening_clarity", "retention_strength", "service_value", "stewardship_usefulness", "canon_fit", "conviction", "platform_readiness", "message_integrity", "total_score", and "reasoning".
 - "virality" must include: "hook_score", "engagement_score", "value_score", "shareability_score", "total_score", "hook_type", and "virality_reasoning".
@@ -392,8 +421,19 @@ THIH scoring is the governing ranking signal. Virality is secondary and should n
 7. platform_readiness: Whether the clip can stand alone on short-form platforms with clean boundaries and usable pacing.
 8. message_integrity: Whether the selected span preserves the speaker's meaning without distortion or missing context.
 
+Required editorial evidence for each candidate:
+- hook_sentence must be the exact first strong sentence viewers hear after trimming.
+- key_point must name the concrete point captured by the selected span.
+- start_reason must explain why the start boundary is the hook or minimum needed setup.
+- end_reason must explain why the end boundary lands a complete thought.
+- moment_type must be one of: Strong Opening Conviction, Scripture Explanation, Practical Application, Repentance / Heart-Check, Memorable Quote, Leadership / Work / Stewardship, Prayer or Invitation.
+- why_selected must cite transcript evidence, not generic claims like "this is engaging."
+- why_this_is_not_intro must prove the candidate is not just welcome/setup/branding/context.
+- why_this_is_complete_thought must explain the setup, point, and payoff inside the span.
+- rejection_risks should list any risk such as intro setup, weak hook, incomplete ending, duplicate idea, or missing context.
+
 Recommended metadata:
-- recommended_title should be concise, specific, and grounded in the selected span.
+- suggested_title and recommended_title should be concise, specific, and grounded in the selected span.
 - recommended_caption should be platform-ready and preserve the source message.
 - recommended_cta should invite reflection, saving, sharing, or a faithful next step without manipulative language.
 - recommended_hashtags should include 3-6 relevant hashtags.
@@ -415,6 +455,7 @@ TIMING GUIDELINES:
 - Include enough context for the segment to be understandable
 - Prefer roughly 30-50 seconds when possible
 - Start at the hook or the minimum setup needed to make the hook land, and end after the payoff
+- Reject generic intros unless the intro sentence itself is a strong hook; avoid starts like "today," "in this video," "welcome," "we are talking about," or repeated branding/context
 - If a highlight is only one good line, expand to include the surrounding setup and payoff rather than returning a tiny fragment
 - Stop expanding when the topic drifts, the speaker repeats the same point, or the clip loses momentum
 
@@ -754,7 +795,7 @@ JSON-only output requirements:
 - Return one valid JSON object and nothing else.
 - No Markdown, headings, bullets, code fences, or explanatory text outside JSON.
 - Top-level keys: "most_relevant_segments", "summary", "key_topics"{', "broll_opportunities"' if include_broll else ''}.
-- Segment keys: "start_time", "end_time", "text", "relevance_score", "reasoning", "content_mode", "thih", "virality", "recommended_title", "recommended_caption", "recommended_cta", "recommended_hashtags", "platform_fit", "scripture_reference", "content_warning".
+- Segment keys: "start_time", "end_time", "text", "relevance_score", "reasoning", "content_mode", "thih", "virality", "hook_sentence", "key_point", "start_reason", "end_reason", "moment_type", "why_selected", "why_this_is_not_intro", "why_this_is_complete_thought", "suggested_title", "recommended_title", "recommended_caption", "recommended_cta", "recommended_hashtags", "platform_fit", "scripture_reference", "content_warning", "rejection_risks".
 - THIH scoring keys: "opening_clarity", "retention_strength", "service_value", "stewardship_usefulness", "canon_fit", "conviction", "platform_readiness", "message_integrity", "total_score", "reasoning".
 - Virality keys: "hook_score", "engagement_score", "value_score", "shareability_score", "total_score", "hook_type", "virality_reasoning".
 - THIH scoring is primary; virality is secondary.
@@ -913,6 +954,415 @@ def _repair_segment_bounds(
     return repaired_start, repaired_end
 
 
+
+GENERIC_INTRO_RE = re.compile(
+    r"(?i)^\s*(welcome|hey|hello|today\b|in this video|we are talking about|"
+    r"this message is about|before we start|let'?s talk about|i want to talk)\b"
+)
+GENERIC_REASON_RE = re.compile(
+    r"(?i)^\s*(good clip|great clip|interesting|important|engaging|viral|selected by the ai|"
+    r"this is a good|this is an important)\b\.?\s*$"
+)
+SENTENCE_RE = re.compile(r"[^.!?]+[.!?]?")
+MOMENT_TYPES = {
+    "Strong Opening Conviction",
+    "Scripture Explanation",
+    "Practical Application",
+    "Repentance / Heart-Check",
+    "Memorable Quote",
+    "Leadership / Work / Stewardship",
+    "Prayer or Invitation",
+}
+
+
+def _sentences(text: str) -> list[str]:
+    return [sentence.strip() for sentence in SENTENCE_RE.findall(text or "") if sentence.strip()]
+
+
+def _first_sentence(text: str) -> str:
+    parts = _sentences(text)
+    return parts[0] if parts else (text or "").strip()
+
+
+def _final_sentence(text: str) -> str:
+    parts = _sentences(text)
+    return parts[-1] if parts else (text or "").strip()
+
+
+def _normalize_words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", (text or "").lower())
+
+
+def _text_similarity(left: str, right: str) -> float:
+    left_words = set(_normalize_words(left))
+    right_words = set(_normalize_words(right))
+    if not left_words or not right_words:
+        return 0.0
+    return len(left_words & right_words) / max(1, len(left_words | right_words))
+
+
+def _find_sentence_span(transcript_spans: list[dict[str, Any]], sentence: str) -> tuple[int, int] | None:
+    sentence_words = set(_normalize_words(sentence))
+    if not sentence_words:
+        return None
+    best: tuple[float, int, int] | None = None
+    for span in transcript_spans:
+        span_words = set(_normalize_words(span.get("text", "")))
+        if not span_words:
+            continue
+        overlap = len(sentence_words & span_words) / max(1, len(sentence_words))
+        if overlap >= 0.55 and (best is None or overlap > best[0]):
+            best = (overlap, int(span["start"]), int(span["end"]))
+    if best:
+        return best[1], best[2]
+    return None
+
+
+def _score_hook_sentence(sentence: str) -> dict[str, int]:
+    words = _normalize_words(sentence)
+    text = (sentence or "").strip().lower()
+    directness = 2 if len(words) >= 5 and not GENERIC_INTRO_RE.search(text) else 0
+    tension_terms = {"cannot", "stop", "never", "but", "not", "without", "breaking", "repent", "wrong", "cost"}
+    tension = 2 if any(word in tension_terms for word in words) else 0
+    clarity = 2 if 6 <= len(words) <= 24 else 1 if len(words) >= 4 else 0
+    specificity = 2 if any(len(word) >= 8 for word in words) or any(char.isdigit() for char in text) else 1 if len(set(words)) >= 5 else 0
+    standalone = 2 if directness and clarity and not text.startswith(("and ", "but ", "so ", "because ", "that ", "this ")) else 0
+    return {
+        "directness": directness,
+        "tension": tension,
+        "clarity": clarity,
+        "specificity": specificity,
+        "first_sentence_strength": min(2, directness + tension),
+        "standalone_feed_strength": standalone,
+    }
+
+
+def _score_ending_sentence(sentence: str) -> dict[str, int]:
+    text = (sentence or "").strip().lower()
+    words = _normalize_words(sentence)
+    lands = 2 if any(word in words for word in ["therefore", "begins", "remember", "choose", "pray", "amen", "faithful", "wisdom", "purpose"]) else 1
+    complete = 0 if text.endswith(("and", "but", "because", "so", "to")) else 2
+    conviction = 2 if any(word in words for word in ["must", "cannot", "will", "faithful", "conviction", "truth", "repent", "wisdom"]) else 1
+    avoids_drift = 0 if text.startswith(("now ", "next ", "another thing")) else 2
+    return {
+        "lands": lands,
+        "complete_thought": complete,
+        "conviction_or_invitation": conviction,
+        "avoids_trailing_topic": avoids_drift,
+    }
+
+
+def _is_generic_reason(value: str) -> bool:
+    return not value or len(_normalize_words(value)) < 7 or bool(GENERIC_REASON_RE.search(value))
+
+
+def _has_mid_thought_risk(segment: TranscriptSegment, final_sentence: str) -> bool:
+    final_text = (final_sentence or segment.text or "").strip()
+    if final_text.endswith((",", ";", ":")):
+        return True
+    risk_text = " ".join(segment.rejection_risks or []).lower()
+    return any(
+        marker in risk_text
+        for marker in (
+            "mid-thought",
+            "mid thought",
+            "trailing phrase",
+            "unfinished",
+            "incomplete ending",
+            "ends mid",
+        )
+    )
+
+
+def _clean_hook_text(sentence: str) -> str:
+    return re.sub(r"^speaker\s+[a-z0-9]+:\s*", "", (sentence or "").strip(), flags=re.IGNORECASE).strip()
+
+
+def _is_weak_setup_hook(sentence: str) -> bool:
+    lowered = _clean_hook_text(sentence).lower()
+    return lowered.startswith((
+        "many remember",
+        "some of you remember",
+        "i remember",
+        "back in",
+        "in the late",
+        "there was a time",
+        "set apart in",
+        "this is an interesting",
+        "this is a background",
+        "here is some background",
+        "let me give you some background",
+        "a little background",
+    ))
+
+
+def _is_context_dependent_hook(sentence: str) -> bool:
+    lowered = _clean_hook_text(sentence).lower()
+    return lowered.startswith(("that is how", "this is how", "that is why", "this is why", "that means", "this means"))
+
+
+def _ending_only_sets_up_next_idea(segment: TranscriptSegment) -> bool:
+    ending_claim = f"{segment.end_reason} {segment.why_this_is_complete_thought}".lower()
+    return any(
+        marker in ending_claim
+        for marker in (
+            "tees up",
+            "tee up",
+            "sets up",
+            "points toward",
+            "before the longer",
+            "before the next",
+            "without needing the whole resolution",
+            "problem setup",
+        )
+    )
+
+
+def _calculate_publishability_score(
+    segment: TranscriptSegment,
+    hook_total: int,
+    ending_total: int,
+    intro_shifted: bool,
+) -> tuple[int, dict[str, int], str]:
+    hook_score = round((hook_total / 12) * 20)
+    key_point_score = 15 if len(_normalize_words(segment.key_point)) >= 6 else 8 if segment.key_point else 0
+    complete_thought_score = round((ending_total / 8) * 15)
+    first_sentence = _first_sentence(segment.text)
+    intro_risk_score = 5 if GENERIC_INTRO_RE.search(first_sentence) else 8 if intro_shifted else 10
+    ending_score = round((ending_total / 8) * 10)
+    moment_type_fit = 10 if segment.moment_type in MOMENT_TYPES else 0
+    platform_fit = 10 if segment.platform_fit else 5
+    duplicate_risk = 10
+    sermon_integrity_score = segment.thih.message_integrity if segment.thih else 8
+    score_breakdown = {
+        "hook_score": hook_score,
+        "key_point_score": key_point_score,
+        "complete_thought_score": complete_thought_score,
+        "intro_risk_score": intro_risk_score,
+        "ending_score": ending_score,
+        "moment_type_fit": moment_type_fit,
+        "platform_fit": platform_fit,
+        "duplicate_risk": duplicate_risk,
+        "sermon_integrity_score": sermon_integrity_score,
+    }
+    total = max(0, min(100, sum(score_breakdown.values())))
+    verdict = "publishable" if total >= 70 else "borderline" if total >= 55 else "reject"
+    return total, score_breakdown, verdict
+
+
+def _build_candidate_audit(
+    segment: TranscriptSegment,
+    *,
+    candidate_id: str,
+    decision: str,
+    rejection_reason: str | None = None,
+    shift_reason: str | None = None,
+) -> dict[str, Any]:
+    audit = dict(segment.clip_intelligence or {})
+    audit.update(
+        {
+            "candidate_id": candidate_id,
+            "decision": decision,
+            "raw_start": audit.get("raw_start_time", segment.start_time),
+            "raw_end": audit.get("raw_end_time", segment.end_time),
+            "normalized_start": segment.start_time,
+            "normalized_end": segment.end_time,
+            "first_sentence": audit.get("exact_first_sentence", _first_sentence(segment.text)),
+            "final_sentence": audit.get("exact_final_sentence", _final_sentence(segment.text)),
+            "hook_score": sum(segment.hook_score_breakdown.values()) if segment.hook_score_breakdown else 0,
+            "intro_risk": 1 if GENERIC_INTRO_RE.search(_first_sentence(segment.text)) else 0,
+            "key_point": segment.key_point,
+            "rejection_reason": rejection_reason,
+            "shift_reason": shift_reason,
+            "publishability_score": segment.publishability_score,
+            "hook_sentence": segment.hook_sentence,
+            "moment_type": segment.moment_type,
+            "start_reason": segment.start_reason,
+            "end_reason": segment.end_reason,
+            "transcript_evidence": segment.text,
+        }
+    )
+    return audit
+
+
+def _is_duplicate_candidate(
+    segment: TranscriptSegment,
+    start_seconds: int,
+    end_seconds: int,
+    accepted: list[tuple[TranscriptSegment, int, int]],
+) -> bool:
+    for other, other_start, other_end in accepted:
+        if abs(start_seconds - other_start) <= 5:
+            return True
+        overlap = max(0, min(end_seconds, other_end) - max(start_seconds, other_start))
+        shorter = max(1, min(end_seconds - start_seconds, other_end - other_start))
+        if overlap / shorter > 0.5:
+            return True
+        if _text_similarity(segment.key_point or segment.text, other.key_point or other.text) >= 0.72:
+            return True
+    return False
+
+
+def _apply_clip_intelligence_gate(
+    segment: TranscriptSegment,
+    transcript_spans: list[dict[str, Any]],
+    start_seconds: int,
+    end_seconds: int,
+) -> tuple[TranscriptSegment | None, int, int, str | None, dict[str, Any]]:
+    raw_start_time = segment.start_time
+    raw_end_time = segment.end_time
+    text = segment.text.strip()
+    hook_sentence = (segment.hook_sentence or _first_sentence(text)).strip()
+    first_sentence = _first_sentence(text)
+    final_sentence = _final_sentence(text)
+    intro_shifted = False
+
+    if GENERIC_INTRO_RE.search(first_sentence) and hook_sentence and hook_sentence != first_sentence:
+        hook_span = _find_sentence_span(transcript_spans, hook_sentence)
+        if hook_span and hook_span[0] > start_seconds and end_seconds - hook_span[0] >= MIN_ACCEPTED_CLIP_SECONDS:
+            start_seconds = hook_span[0]
+            segment.start_time = _format_transcript_timestamp(start_seconds)
+            repaired_text = _extract_transcript_text(transcript_spans, start_seconds, end_seconds)
+            if repaired_text:
+                segment.text = repaired_text
+                text = repaired_text
+                first_sentence = _first_sentence(text)
+                final_sentence = _final_sentence(text)
+            intro_shifted = True
+
+    segment.hook_sentence = hook_sentence or first_sentence
+    if not segment.key_point:
+        segment.key_point = segment.hook_sentence if len(_normalize_words(segment.hook_sentence)) >= 6 else ""
+    if not segment.moment_type or segment.moment_type not in MOMENT_TYPES:
+        segment.moment_type = _infer_moment_type(segment.text)
+
+    hook_scores = _score_hook_sentence(segment.hook_sentence or first_sentence)
+    ending_scores = _score_ending_sentence(final_sentence)
+    hook_total = sum(hook_scores.values())
+    ending_total = sum(ending_scores.values())
+    rejection_reasons: list[str] = []
+
+    if GENERIC_INTRO_RE.search(first_sentence) and not intro_shifted:
+        rejection_reasons.append("starts with generic intro/setup language")
+    if _is_weak_setup_hook(segment.hook_sentence or first_sentence):
+        rejection_reasons.append("hook is weak setup rather than feed-ready tension")
+    if _is_context_dependent_hook(segment.hook_sentence or first_sentence):
+        rejection_reasons.append("hook is not standalone without previous context")
+    if not segment.key_point or len(_normalize_words(segment.key_point)) < 4:
+        rejection_reasons.append("lacks a clear key point")
+    if hook_total < 7:
+        rejection_reasons.append("first 3 seconds do not contain a strong hook")
+    if ending_total < 5:
+        rejection_reasons.append("ending does not land as a complete thought")
+    if _has_mid_thought_risk(segment, final_sentence):
+        rejection_reasons.append("candidate ends mid-thought or with a trailing phrase")
+    if _is_generic_reason(segment.why_selected or segment.reasoning):
+        rejection_reasons.append("selection reason is generic or empty")
+    if not segment.hook_sentence:
+        rejection_reasons.append("hook_sentence evidence is missing")
+    if not segment.start_reason or _is_generic_reason(segment.start_reason):
+        rejection_reasons.append("start_reason evidence is missing or generic")
+    if not segment.end_reason or _is_generic_reason(segment.end_reason):
+        rejection_reasons.append("end_reason evidence is missing or generic")
+    if not segment.why_selected or _is_generic_reason(segment.why_selected):
+        rejection_reasons.append("why_selected evidence is missing or generic")
+    if not text or len(_normalize_words(text)) < 6:
+        rejection_reasons.append("transcript_evidence is missing")
+    if not segment.why_this_is_not_intro:
+        rejection_reasons.append("why_this_is_not_intro evidence is missing")
+    if not segment.why_this_is_complete_thought:
+        rejection_reasons.append("complete thought evidence is missing")
+    if _ending_only_sets_up_next_idea(segment):
+        rejection_reasons.append("ending only sets up the next idea instead of landing the thought")
+
+    publishability_score, publishability_breakdown, publishability_verdict = _calculate_publishability_score(
+        segment,
+        hook_total,
+        ending_total,
+        intro_shifted,
+    )
+    if publishability_verdict == "reject":
+        rejection_reasons.append("THIH publishability score is below acceptance threshold")
+
+    audit = {
+        "raw_start_time": raw_start_time,
+        "raw_end_time": raw_end_time,
+        "normalized_start_time": segment.start_time,
+        "normalized_end_time": segment.end_time,
+        "exact_first_sentence": first_sentence,
+        "exact_final_sentence": final_sentence,
+        "hook_sentence": segment.hook_sentence,
+        "hook_reason": segment.start_reason or f"Hook score {hook_total}/12 from transcript evidence.",
+        "key_point_captured": segment.key_point,
+        "moment_type": segment.moment_type,
+        "why_selected": segment.why_selected or segment.reasoning,
+        "why_not_rejected": segment.why_this_is_not_intro or "Passed deterministic intro, hook, completeness, and duplicate gates.",
+        "score_breakdown": {
+            "hook": hook_scores,
+            "ending": ending_scores,
+            "thih_total": segment.thih.total_score if segment.thih else 0,
+            "virality_total": segment.virality.total_score if segment.virality else 0,
+            "publishability": publishability_breakdown,
+        },
+        "publishability_score": publishability_score,
+        "publishability_verdict": publishability_verdict,
+        "transcript_evidence_used": text,
+        "intro_shifted": intro_shifted,
+        "rejection_risks": segment.rejection_risks,
+    }
+    segment.hook_score_breakdown = hook_scores
+    segment.ending_score_breakdown = ending_scores
+    segment.publishability_score = publishability_score
+    segment.publishability_verdict = publishability_verdict
+    segment.clip_intelligence = audit
+    if segment.thih:
+        segment.thih.reasoning = f"{segment.thih.reasoning} Hook evidence: {segment.hook_sentence} Key point: {segment.key_point}".strip()
+
+    if rejection_reasons:
+        logger.info(
+            "Clip Intelligence Audit rejected: raw=%s-%s normalized=%s-%s reasons=%s evidence=%s",
+            raw_start_time,
+            raw_end_time,
+            segment.start_time,
+            segment.end_time,
+            rejection_reasons,
+            text[:240],
+        )
+        return None, start_seconds, end_seconds, "; ".join(rejection_reasons), audit
+
+    logger.info(
+        "Clip Intelligence Audit accepted: raw=%s-%s normalized=%s-%s hook=%s key_point=%s moment_type=%s why_selected=%s scores=%s evidence=%s",
+        raw_start_time,
+        raw_end_time,
+        segment.start_time,
+        segment.end_time,
+        segment.hook_sentence,
+        segment.key_point,
+        segment.moment_type,
+        audit["why_selected"],
+        audit["score_breakdown"],
+        text[:240],
+    )
+    return segment, start_seconds, end_seconds, None, audit
+
+
+def _infer_moment_type(text: str) -> str:
+    lowered = (text or "").lower()
+    if any(term in lowered for term in ["romans", "scripture", "verse", "bible", "god says"]):
+        return "Scripture Explanation"
+    if any(term in lowered for term in ["repent", "heart", "conviction", "turn from"]):
+        return "Repentance / Heart-Check"
+    if any(term in lowered for term in ["work", "steward", "calling", "leadership", "business"]):
+        return "Leadership / Work / Stewardship"
+    if any(term in lowered for term in ["pray", "prayer", "invitation", "amen"]):
+        return "Prayer or Invitation"
+    if any(term in lowered for term in ["do this", "practice", "step", "apply"]):
+        return "Practical Application"
+    if len(_sentences(text)) <= 2:
+        return "Memorable Quote"
+    return "Strong Opening Conviction"
+
+
 async def get_most_relevant_parts_by_transcript(
     transcript: str,
     include_broll: bool = False,
@@ -972,8 +1422,12 @@ async def get_most_relevant_parts_by_transcript(
 
         # Validation with virality data handling
         validated_segments = []
+        accepted_ranges: list[tuple[TranscriptSegment, int, int]] = []
+        accepted_candidate_audits: list[dict[str, Any]] = []
+        rejected_candidate_audits: list[dict[str, Any]] = []
         transcript_spans = _parse_transcript_spans(transcript)
-        for segment in analysis.most_relevant_segments:
+        for candidate_index, segment in enumerate(analysis.most_relevant_segments, start=1):
+            candidate_id = f"candidate-{candidate_index}"
             # Validate text content
             if not segment.text.strip() or len(segment.text.split()) < 3:
                 logger.warning(
@@ -1026,6 +1480,47 @@ async def get_most_relevant_parts_by_transcript(
                     )
                     continue
 
+                gated_segment, start_seconds, end_seconds, rejection_reason, gate_audit = _apply_clip_intelligence_gate(
+                    segment,
+                    transcript_spans,
+                    start_seconds,
+                    end_seconds,
+                )
+                if gated_segment is None:
+                    logger.info(
+                        "Skipping segment after clip intelligence gate: %s",
+                        rejection_reason,
+                    )
+                    rejected_candidate_audits.append(
+                        _build_candidate_audit(
+                            segment,
+                            candidate_id=candidate_id,
+                            decision="rejected",
+                            rejection_reason=rejection_reason,
+                            shift_reason="shifted past intro" if gate_audit.get("intro_shifted") else None,
+                        )
+                    )
+                    continue
+                segment = gated_segment
+                duration = end_seconds - start_seconds
+                if _is_duplicate_candidate(segment, start_seconds, end_seconds, accepted_ranges):
+                    logger.info(
+                        "Skipping duplicate clip candidate after intelligence gate: %s-%s key_point=%s",
+                        segment.start_time,
+                        segment.end_time,
+                        segment.key_point,
+                    )
+                    rejected_candidate_audits.append(
+                        _build_candidate_audit(
+                            segment,
+                            candidate_id=candidate_id,
+                            decision="rejected",
+                            rejection_reason="duplicate idea or overlapping timestamp range",
+                            shift_reason="shifted past intro" if gate_audit.get("intro_shifted") else None,
+                        )
+                    )
+                    continue
+
                 # Validate virality scores
                 if segment.virality:
                     # Ensure total score is sum of subscores
@@ -1041,7 +1536,16 @@ async def get_most_relevant_parts_by_transcript(
                         )
                         segment.virality.total_score = calculated_total
 
+                accepted_ranges.append((segment, start_seconds, end_seconds))
                 validated_segments.append(segment)
+                accepted_candidate_audits.append(
+                    _build_candidate_audit(
+                        segment,
+                        candidate_id=candidate_id,
+                        decision="shifted" if gate_audit.get("intro_shifted") else "accepted",
+                        shift_reason="shifted past intro to first strong hook sentence" if gate_audit.get("intro_shifted") else None,
+                    )
+                )
                 virality_info = (
                     f", virality={segment.virality.total_score}"
                     if segment.virality
@@ -1067,11 +1571,20 @@ async def get_most_relevant_parts_by_transcript(
             reverse=True,
         )
 
+        candidate_review = {
+            "raw_count": len(analysis.most_relevant_segments),
+            "accepted_count": len(accepted_candidate_audits),
+            "rejected_count": len(rejected_candidate_audits),
+            "accepted_candidates": accepted_candidate_audits,
+            "rejected_candidates": rejected_candidate_audits,
+        }
+
         final_analysis = TranscriptAnalysis(
             most_relevant_segments=validated_segments,
             summary=analysis.summary,
             key_topics=analysis.key_topics,
             broll_opportunities=analysis.broll_opportunities if include_broll else None,
+            candidate_review=candidate_review,
         )
 
         logger.info(f"Selected {len(validated_segments)} segments for processing")
@@ -1091,6 +1604,7 @@ async def get_most_relevant_parts_by_transcript(
 def get_most_relevant_parts_sync(transcript: str) -> TranscriptAnalysis:
     """Synchronous wrapper for the async function."""
     return asyncio.run(get_most_relevant_parts_by_transcript(transcript))
+
 
 
 

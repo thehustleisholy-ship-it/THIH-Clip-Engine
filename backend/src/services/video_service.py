@@ -40,6 +40,21 @@ logger = logging.getLogger(__name__)
 UPLOAD_URL_PREFIX = "upload://"
 
 THIH_SEGMENT_METADATA_FIELDS = (
+    "hook_sentence",
+    "key_point",
+    "start_reason",
+    "end_reason",
+    "moment_type",
+    "why_selected",
+    "why_this_is_not_intro",
+    "why_this_is_complete_thought",
+    "suggested_title",
+    "rejection_risks",
+    "hook_score_breakdown",
+    "ending_score_breakdown",
+    "publishability_score",
+    "publishability_verdict",
+    "clip_intelligence",
     "content_mode",
     "recommended_title",
     "recommended_caption",
@@ -95,6 +110,11 @@ def build_segment_json(segment: Any) -> Dict[str, Any]:
             "message_integrity",
         ],
     )
+    for field in THIH_SEGMENT_METADATA_FIELDS:
+        value = _segment_value(segment, field)
+        if value is not None:
+            thih[field] = value
+
     payload = {
         "start_time": _segment_value(segment, "start_time"),
         "end_time": _segment_value(segment, "end_time"),
@@ -491,6 +511,7 @@ content_mode=content_mode,
         should_cancel: Optional[Callable[[], Awaitable[bool]]] = None,
 content_mode: str = "thih_systems",
         selection_instructions: Optional[str] = None,
+        analysis_only: bool = False,
     ) -> Dict[str, Any]:
         """
         Complete video processing pipeline.
@@ -611,7 +632,7 @@ content_mode=content_mode,
                 raise Exception("Task cancelled")
 
             if progress_callback:
-                await progress_callback(70, "Creating video clips...", "processing")
+                await progress_callback(70, "Reviewing clip candidates..." if analysis_only else "Creating video clips...", "processing")
 
             raw_segments = relevant_parts.most_relevant_segments
             segments_json: List[Dict[str, Any]] = [
@@ -631,9 +652,13 @@ content_mode=content_mode,
             if processing_mode == "fast":
                 segments_json = segments_json[: runtime_config.fast_mode_max_clips]
 
+            candidate_review = getattr(relevant_parts, "candidate_review", {}) or {}
+
             return {
                 "segments": segments_json,
-                "segments_to_render": segments_json,
+                "segments_to_render": [] if analysis_only else segments_json,
+                "candidate_review": candidate_review,
+                "analysis_only": analysis_only,
                 "video_path": str(video_path),
                 "clips": [],
                 "summary": relevant_parts.summary if relevant_parts else None,
@@ -646,6 +671,7 @@ content_mode=content_mode,
                         if relevant_parts
                         else [],
                         "most_relevant_segments": segments_json,
+                        "candidate_review": candidate_review,
                     }
                 ),
             }

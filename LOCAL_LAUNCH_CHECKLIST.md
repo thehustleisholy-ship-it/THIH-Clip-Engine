@@ -171,6 +171,29 @@ Developer note:
 - Use short clips for backend/rendering verification and regression checks.
 - Use full sermons only for final end-to-end proof after the short workflow is clean.
 
+## Clip Intelligence Acceptance Test
+
+Compile, unit tests, lint, and Docker health are developer checks only. They do not prove clip intelligence works.
+
+Before calling a P0 clip-intelligence fix accepted, run the deterministic sermon fixture and at least one real analysis-only sermon pass. The fixture covers repetitive intro/setup language, a weak generic opening, two strong hook moments, Scripture explanation, practical application, an incomplete thought, and a duplicate idea.
+
+Direct fixture command:
+
+```powershell
+cd backend
+uv run pytest tests/acceptance/test_clip_intelligence_acceptance.py --no-cov
+```
+
+Acceptance requires the fixture to prove:
+
+- intro/setup is rejected or shifted
+- weak generic hook is rejected
+- incomplete thought is rejected
+- duplicate idea is rejected
+- accepted candidates include hook sentence, key point, start reason, end reason, why_selected, transcript evidence, and publishability score
+- `analysis_only` returns `candidate_review` and `segments_to_render` is empty
+
+Then run one real sermon in analysis-only mode and inspect `candidate_review` before rendering. A real pass must show accepted candidates with the full audit fields, rejected candidates with clear rejection reasons, fewer quality clips allowed when appropriate, and no rendered clips in analysis-only mode.
 ## 7. Submit a YouTube URL
 
 1. Open `http://localhost:3107`.
@@ -268,3 +291,4 @@ docker compose down
 ```
 
 To remove local database/cache/media volumes, use Docker Desktop or `docker volume rm` carefully. Removing volumes deletes local data.
+

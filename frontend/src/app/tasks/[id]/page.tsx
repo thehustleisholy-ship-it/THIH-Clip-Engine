@@ -77,6 +77,37 @@ interface Clip {
   value_score: number;
   shareability_score: number;
   hook_type: string | null;
+  thih_score?: number;
+  thih?: Record<string, unknown> | null;
+  content_mode?: string | null;
+  recommended_title?: string | null;
+  recommended_caption?: string | null;
+  recommended_cta?: string | null;
+  recommended_hashtags?: string[];
+  platform_fit?: string[];
+  scripture_reference?: string | null;
+  content_warning?: string | null;
+}
+
+interface CandidateAudit {
+  candidate_id?: string;
+  decision?: string;
+  normalized_start?: string;
+  normalized_end?: string;
+  hook_sentence?: string;
+  key_point?: string;
+  moment_type?: string;
+  publishability_score?: number;
+  start_reason?: string;
+  end_reason?: string;
+  rejection_reason?: string | null;
+  shift_reason?: string | null;
+  transcript_evidence?: string;
+}
+
+interface CandidateReview {
+  accepted_candidates?: CandidateAudit[];
+  rejected_candidates?: CandidateAudit[];
 }
 
 interface TaskDetails {
@@ -100,6 +131,8 @@ interface TaskDetails {
   pause_threshold_ms?: number;
   remove_filler_words?: boolean;
   filtered_words?: string[];
+  candidate_review?: CandidateReview;
+  analysis_only?: boolean;
 }
 
 interface FontOption {
@@ -142,6 +175,7 @@ export default function TaskPage() {
   const [projectRemoveFillerWords, setProjectRemoveFillerWords] = useState(false);
   const [projectFilteredWords, setProjectFilteredWords] = useState("");
   const [isApplyingSettings, setIsApplyingSettings] = useState(false);
+  const [isRenderingCandidates, setIsRenderingCandidates] = useState(false);
   const [settingsSheetOpen, setSettingsSheetOpen] = useState(false);
   const [availableFonts, setAvailableFonts] = useState<FontOption[]>([]);
   const [availableTemplates, setAvailableTemplates] = useState<
@@ -153,6 +187,23 @@ export default function TaskPage() {
   const taskApiUrl = "/api/tasks";
   const getClipUrl = (videoUrl: string) =>
     videoUrl.startsWith("/api/") ? videoUrl : `/api${videoUrl}`;
+
+  const getThihText = (clip: Clip, key: string) => {
+    const value = clip.thih?.[key];
+    return typeof value === "string" && value.trim() ? value.trim() : null;
+  };
+
+  const getThihNumber = (clip: Clip, key: string) => {
+    const value = clip.thih?.[key];
+    return typeof value === "number" ? value : null;
+  };
+
+  const getThihStringList = (clip: Clip, key: string) => {
+    const value = clip.thih?.[key];
+    if (Array.isArray(value)) return value.map(String).filter(Boolean);
+    if (typeof value === "string" && value.trim()) return [value.trim()];
+    return [];
+  };
 
   const buildSupportError = useCallback(async (response: Response, fallbackMessage: string) => {
     const parsed = await parseApiError(response, fallbackMessage);
@@ -623,6 +674,38 @@ export default function TaskPage() {
     }
   };
 
+  const handleRenderSelectedCandidates = async () => {
+    if (!session?.user?.id || !task?.id) return;
+    setIsRenderingCandidates(true);
+    try {
+      const settingsResponse = await fetch(`${taskApiUrl}/${task.id}/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          font_family: task.font_family || "TikTokSans-Regular",
+          font_size: task.font_size || 24,
+          font_color: task.font_color || "#FFFFFF",
+          caption_template: task.caption_template || "default",
+          include_broll: Boolean(task.include_broll),
+          apply_to_existing: false,
+          analysis_only: false,
+        }),
+      });
+      if (!settingsResponse.ok) {
+        alert(await buildSupportError(settingsResponse, "Failed to prepare rendering"));
+        return;
+      }
+      const resumeResponse = await fetch(`${taskApiUrl}/${task.id}/resume`, { method: "POST" });
+      if (!resumeResponse.ok) {
+        alert(await buildSupportError(resumeResponse, "Failed to start rendering"));
+        return;
+      }
+      await fetchTaskStatus();
+    } finally {
+      setIsRenderingCandidates(false);
+    }
+  };
+
   const handleExportClip = async (clipId: string, fallbackFilename: string) => {
     if (!session?.user?.id || !task?.id) return;
 
@@ -861,6 +944,50 @@ export default function TaskPage() {
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
+
+        {task?.candidate_review && (
+          <Card className="mb-6 border-amber-200 bg-amber-50/60">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-black">Candidate Review</h2>
+                  <p className="text-sm text-gray-600">Accepted candidates passed the editorial gate; rejected candidates were not rendered.</p>
+                </div>
+                {task.analysis_only && (
+                  <Button onClick={handleRenderSelectedCandidates} disabled={isRenderingCandidates}>
+                    {isRenderingCandidates ? "Starting render..." : "Render selected candidates"}
+                  </Button>
+                )}
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-gray-900">Accepted</h3>
+                  {(task.candidate_review.accepted_candidates || []).map((candidate) => (
+                    <div key={candidate.candidate_id} className="rounded border border-amber-200 bg-white p-3 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{candidate.normalized_start} - {candidate.normalized_end}</span>
+                        {typeof candidate.publishability_score === "number" && <Badge>{candidate.publishability_score}/100</Badge>}
+                      </div>
+                      {candidate.hook_sentence && <p className="mt-2 text-gray-700"><span className="font-semibold">Hook:</span> {candidate.hook_sentence}</p>}
+                      {candidate.key_point && <p className="mt-1 text-gray-700"><span className="font-semibold">Key point:</span> {candidate.key_point}</p>}
+                      {candidate.moment_type && <p className="mt-1 text-gray-600">{candidate.moment_type}</p>}
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-gray-900">Rejected</h3>
+                  {(task.candidate_review.rejected_candidates || []).map((candidate) => (
+                    <div key={candidate.candidate_id} className="rounded border border-gray-200 bg-white p-3 text-sm">
+                      <div className="font-medium text-gray-900">{candidate.normalized_start} - {candidate.normalized_end}</div>
+                      {candidate.rejection_reason && <p className="mt-2 text-gray-700">{candidate.rejection_reason}</p>}
+                      {candidate.hook_sentence && <p className="mt-1 text-gray-500">{candidate.hook_sentence}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {task?.status === "processing" || task?.status === "queued" ? (
           <div className="space-y-8">
             {/* Progress indicator */}
@@ -1303,6 +1430,88 @@ export default function TaskPage() {
                               </Badge>
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {(clip.thih || clip.thih_score) && (
+                        <div className="mb-4 space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h4 className="font-medium text-black text-sm">Clip Intelligence Audit</h4>
+                            {clip.thih_score !== undefined && clip.thih_score > 0 && (
+                              <Badge className="bg-black text-white">THIH {clip.thih_score}/80</Badge>
+                            )}
+                          </div>
+
+                          <div className="grid gap-3 text-xs text-gray-700 md:grid-cols-2">
+                            {getThihText(clip, "why_selected") && (
+                              <div>
+                                <div className="font-semibold text-gray-900">Why selected</div>
+                                <p>{getThihText(clip, "why_selected")}</p>
+                              </div>
+                            )}
+                            {getThihText(clip, "hook_sentence") && (
+                              <div>
+                                <div className="font-semibold text-gray-900">Hook sentence</div>
+                                <p>{getThihText(clip, "hook_sentence")}</p>
+                              </div>
+                            )}
+                            {getThihText(clip, "key_point") && (
+                              <div>
+                                <div className="font-semibold text-gray-900">Key point</div>
+                                <p>{getThihText(clip, "key_point")}</p>
+                              </div>
+                            )}
+                            {getThihText(clip, "moment_type") && (
+                              <div>
+                                <div className="font-semibold text-gray-900">Moment type</div>
+                                <p>{getThihText(clip, "moment_type")}</p>
+                              </div>
+                            )}
+                            {getThihText(clip, "start_reason") && (
+                              <div>
+                                <div className="font-semibold text-gray-900">Start reason</div>
+                                <p>{getThihText(clip, "start_reason")}</p>
+                              </div>
+                            )}
+                            {getThihText(clip, "end_reason") && (
+                              <div>
+                                <div className="font-semibold text-gray-900">End reason</div>
+                                <p>{getThihText(clip, "end_reason")}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {getThihStringList(clip, "rejection_risks").length > 0 && (
+                            <div className="text-xs text-gray-700">
+                              <div className="font-semibold text-gray-900">Rejection risks</div>
+                              <p>{getThihStringList(clip, "rejection_risks").join(", ")}</p>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+                            {[
+                              ["Opening", "opening_clarity"],
+                              ["Retention", "retention_strength"],
+                              ["Service", "service_value"],
+                              ["Stewardship", "stewardship_usefulness"],
+                              ["Canon", "canon_fit"],
+                              ["Conviction", "conviction"],
+                              ["Platform", "platform_readiness"],
+                              ["Integrity", "message_integrity"],
+                            ].map(([label, key]) => {
+                              const value = getThihNumber(clip, key);
+                              if (value === null) return null;
+                              return (
+                                <div key={key} className="rounded border border-amber-200 bg-white p-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-gray-600">{label}</span>
+                                    <span className="font-semibold text-gray-950">{value}/10</span>
+                                  </div>
+                                  <Progress value={(value / 10) * 100} className="mt-1 h-1" />
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
 
